@@ -8,6 +8,10 @@
 
 A deterministic, multi-agent artificial life (A-life) simulation built in **C++20** and **Raylib 5.0**. Organisms with dynamic multi-tile footprints ($1 \times 1$ up to $4 \times 4$) inhabit a discrete $100 \times 100$ toroidal grid environment, exhibiting emergent lifecycles, dual-mode metabolic regeneration, Chebyshev sensory scanning, scent diffusion, Mendelian-like inheritance, and priority-driven finite state machines (FSM).
 
+<p align="center">
+  <img src="assets/screenshots/preview.png" alt="Autonomous 2D Multi-Tile Organism Simulation Preview" width="850">
+</p>
+
 ---
 
 ## Table of Contents
@@ -158,7 +162,8 @@ organism-sim/
 │       └── main.cpp               # Game loop, input handling, fixed-timestep accumulator
 ├── assets/
 │   ├── fonts/                     # Bundled TrueType vector fonts (Liberation Sans)
-│   └── icons/                     # Multi-resolution icons (.png, .ico, .jpg)
+│   ├── icons/                     # Multi-resolution icons (.png, .ico)
+│   └── screenshots/               # Visual previews & documentation media
 ├── tests/                         # Headless C++20 Test Harness & Matrix
 │   ├── TestHarness.hpp
 │   ├── test_main.cpp
@@ -166,7 +171,8 @@ organism-sim/
 │   ├── test_metabolism.cpp
 │   ├── test_ai_fsm.cpp
 │   └── test_rules.cpp
-└── .planning/                     # Lifecycle engineering & audit artifacts
+├── CONTRIBUTING.md                # Development, test, and contribution guide
+└── LICENSE.md                     # MIT License & asset attributions
 ```
 
 ---

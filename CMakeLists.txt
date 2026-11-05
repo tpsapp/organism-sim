@@ -11,14 +11,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 
-# Common compiler warnings
+# Common compiler warnings and sanitizer configuration (scoped to project targets)
+add_library(project_warnings INTERFACE)
 if(MSVC)
-    add_compile_options(/W4 /permissive-)
+    target_compile_options(project_warnings INTERFACE /W4 /permissive-)
 else()
-    add_compile_options(-Wall -Wextra -pedantic)
+    target_compile_options(project_warnings INTERFACE -Wall -Wextra -pedantic)
     if(ENABLE_SANITIZERS)
-        add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
-        add_link_options(-fsanitize=address,undefined)
+        target_compile_options(project_warnings INTERFACE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(project_warnings INTERFACE -fsanitize=address,undefined)
     endif()
 endif()
 
@@ -49,6 +50,7 @@ target_include_directories(sim_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
+target_link_libraries(sim_core PUBLIC project_warnings)
 target_compile_features(sim_core PUBLIC cxx_std_20)
 
 # -----------------------------------------------------------------------------
@@ -67,7 +69,10 @@ target_include_directories(sim_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/tests
 )
 
-target_link_libraries(sim_tests PRIVATE sim_core)
+target_link_libraries(sim_tests PRIVATE
+    sim_core
+    project_warnings
+)
 
 # -----------------------------------------------------------------------------
 # Target 3: Interactive Raylib Application (organism_sim)
@@ -84,6 +89,7 @@ target_include_directories(organism_sim PRIVATE
 
 target_link_libraries(organism_sim PRIVATE
     sim_core
+    project_warnings
     raylib
 )
 
@@ -132,6 +138,18 @@ install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/icon.png
 install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/assets/icons/icon.png
     DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps
     RENAME organism_sim.png
+)
+
+# 4. Vector font assets for custom typography
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/organism_sim/fonts
+)
+
+# 5. Documentation & License
+install(FILES
+    ${CMAKE_CURRENT_SOURCE_DIR}/README.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}
 )
 
 

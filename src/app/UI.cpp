@@ -10,15 +10,23 @@ UI::~UI() {
 }
 
 void UI::Init() {
-    const char* candidate_paths[] = {
+    std::string app_dir = GetApplicationDirectory();
+    std::string candidate_paths[] = {
         "assets/fonts/LiberationSans-Regular.ttf",
         "../assets/fonts/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf"
+        app_dir + "assets/fonts/LiberationSans-Regular.ttf",
+        app_dir + "../assets/fonts/LiberationSans-Regular.ttf",
+        app_dir + "../share/organism_sim/fonts/LiberationSans-Regular.ttf",
+        "/usr/local/share/organism_sim/fonts/LiberationSans-Regular.ttf",
+        "/usr/share/organism_sim/fonts/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf"
     };
 
-    for (const char* path : candidate_paths) {
-        if (FileExists(path)) {
-            font_ = LoadFontEx(path, 36, nullptr, 0);
+    for (const auto& path : candidate_paths) {
+        if (FileExists(path.c_str())) {
+            font_ = LoadFontEx(path.c_str(), 36, nullptr, 0);
             if (font_.texture.id > 0) {
                 SetTextureFilter(font_.texture, TEXTURE_FILTER_BILINEAR);
                 custom_font_loaded_ = true;
