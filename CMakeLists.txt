@@ -145,10 +145,12 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/
     DESTINATION ${CMAKE_INSTALL_DATADIR}/organism_sim/fonts
 )
 
-# 5. Documentation & License
+# 5. Documentation, License & Policies
 install(FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/README.md
     ${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/CONTRIBUTING.md
+    ${CMAKE_CURRENT_SOURCE_DIR}/SECURITY.md
     DESTINATION ${CMAKE_INSTALL_DOCDIR}
 )
 
