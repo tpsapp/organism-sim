@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Organism Sim
+GenericName=Autonomous Multi-Tile A-Life Simulation
+Comment=2D multi-tile artificial life simulation engine with emergent metabolism and reproduction
+Exec=organism_sim
+Icon=organism_sim
+Terminal=false
+Categories=Game;Simulation;Science;ArtificialIntelligence;
+StartupNotify=true
+
