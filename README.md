@@ -172,7 +172,8 @@ organism-sim/
 │   ├── test_ai_fsm.cpp
 │   └── test_rules.cpp
 ├── CONTRIBUTING.md                # Development, test, and contribution guide
-└── LICENSE.md                     # MIT License & asset attributions
+├── LICENSE.md                     # MIT License & asset attributions
+└── SECURITY.md                    # Vulnerability reporting & security policy
 ```
 
 ---
