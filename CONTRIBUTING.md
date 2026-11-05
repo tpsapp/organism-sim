@@ -53,3 +53,4 @@ If you add new simulation rules or behaviors, add corresponding test cases in `t
 1. **Branch Naming:** Use clear branch names like `feature/scent-mutation-refactor` or `fix/grid-boundary-wrap`.
 2. **Atomic Commits:** Keep commits focused with conventional commit messages (e.g., `feat: ...`, `fix: ...`, `docs: ...`, `refactor: ...`).
 3. **Test Coverage:** Every bug fix must include a regression test; every new simulation feature must include boundary condition unit tests.
+

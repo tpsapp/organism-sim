@@ -26,3 +26,4 @@ If applicable, add screenshots or terminal output (e.g. sanitizer trace).
  - OS: [e.g. Ubuntu 22.04, Arch Linux, Windows 11]
  - Compiler & Version: [e.g. GCC 13.2, Clang 17, MSVC 19.38]
  - Display Server: [e.g. X11, Wayland]
+
