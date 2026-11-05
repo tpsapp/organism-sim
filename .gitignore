@@ -1,3 +1,6 @@
+# Planning and agent lifecycle artifacts
+.planning/
+
 # Build directories
 build/
 bin/
