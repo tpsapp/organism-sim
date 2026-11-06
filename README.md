@@ -89,7 +89,7 @@ As organisms consume food and survive across seasons, their lifetime calorie cou
 │                                                        │  A-Life Engine       │
 │                                                        │  ──────────────────  │
 │                                                        │  STATUS: RUNNING     │
-│                 100 x 100 PLAYFIELD                    │  1x | Step 1,420     │
+│                 100 x 100 PLAYFIELD                    │  Speed: 1x | Steps:12│
 │                 (1000 x 1000 px)                       │  ──────────────────  │
 │                                                        │  GRID OCCUPANCY      │
 │  - Food: Burgundy Red tiles                            │  1,250 (12.5%)       │
@@ -98,6 +98,7 @@ As organisms consume food and survive across seasons, their lifetime calorie cou
 │  - Females: Vibrant Yellow (health-shaded)             │  POPULATION STATS    │
 │  - Hover: Dual Gold/White highlight box                │  Total: 84 | Gest: 6 │
 │  - Sensory: Cyan Sight & Violet Smell Boxes            │  Males: 42 | Fem: 42 │
+│                                                        │  Food: 250 | Wtr: 250│
 │                                                        │  [Sparkline Graph]   │
 │                                                        │  ──────────────────  │
 │                                                        │  MANUAL PLACEMENT    │

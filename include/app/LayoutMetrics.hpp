@@ -15,19 +15,22 @@ struct SidebarLayout {
         }
         y += 10; // Divider spacing
 
-        // Status row (Status, Speed, Steps on compact row)
-        y += 20;
+        // Status banner row
+        y += 18;
+        // Time Scale & Step counter row
+        y += 18;
         y += 10; // Divider spacing
 
         // Grid occupancy (Label + counts on top row, bar below)
         y += 18;        // Label row
         y += 10 + 10;   // Bar (10px) + divider spacing (10px)
 
-        // Population stats (2 columns: 3 text rows + graph)
+        // Population stats (2 columns: 4 text rows + graph)
         y += 20;        // Title ("POPULATION STATS")
-        y += 18;        // Row 1: Total & Gestating
-        y += 18;        // Row 2: Males & Females
-        y += 20;        // Row 3: Food/Water & Avg Age
+        y += 16;        // Row 1: Total & Gestating
+        y += 16;        // Row 2: Males & Females
+        y += 16;        // Row 3: Food & Water
+        y += 18;        // Row 4: Avg Age
         y += 42 + 8;    // Sparkline graph (42px) + spacing
         y += 10;        // Divider spacing
 
@@ -69,3 +72,4 @@ struct SidebarLayout {
 };
 
 } // namespace app
+

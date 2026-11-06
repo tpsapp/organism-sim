@@ -78,7 +78,7 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
     DrawLine(sx + 20, y, sx + sw - 20, y, Color{50, 52, 65, 255});
     y += 10;
 
-    // Status Banner & Time Scale / Steps (Single compact row)
+    // Status Banner & Time Scale / Steps
     sim::GameStatus status = sim.GetGameStatus();
     if (status == sim::GameStatus::ONGOING) {
         if (paused) {
@@ -91,6 +91,7 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
     } else {
         DrawCrispText("STATUS: EXTINCTION", static_cast<float>(sx + 20), static_cast<float>(y), 14.0f, Color{231, 76, 60, 255});
     }
+    y += 18;
 
     auto format_step_count = [](uint64_t count) -> std::string {
         std::string s = std::to_string(count);
@@ -103,8 +104,8 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
     };
 
     std::ostringstream ss_meta;
-    ss_meta << std::fixed << std::setprecision(0) << time_scale << "x | Step " << format_step_count(sim.GetStepCount());
-    DrawCrispText(ss_meta.str(), static_cast<float>(sx + 145), static_cast<float>(y + 1), 12.0f, Color{180, 185, 200, 255});
+    ss_meta << "Speed: " << std::fixed << std::setprecision(0) << time_scale << "x  |  Step: " << format_step_count(sim.GetStepCount());
+    DrawCrispText(ss_meta.str(), static_cast<float>(sx + 20), static_cast<float>(y), 12.5f, Color{180, 185, 200, 255});
     y += 18;
 
     DrawLine(sx + 20, y, sx + sw - 20, y, Color{50, 52, 65, 255});
@@ -146,7 +147,7 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
     DrawCrispText("Females: " + std::to_string(sim.FemaleCount()), static_cast<float>(sx + 145), static_cast<float>(y), 12.5f, Color{240, 220, 70, 255});
     y += 16;
 
-    // Row 3: Food / Water & Avg Age
+    // Row 3: Food & Water
     size_t food_cnt = 0;
     size_t water_cnt = 0;
     for (const auto& r : sim.GetEntities().GetResources()) {
@@ -154,10 +155,14 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
         if (r.type == sim::EntityType::FOOD) ++food_cnt;
         else ++water_cnt;
     }
-    DrawCrispText("Food: " + std::to_string(food_cnt) + " | Wtr: " + std::to_string(water_cnt), static_cast<float>(sx + 20), static_cast<float>(y), 11.5f, Color{160, 165, 180, 255});
+    DrawCrispText("Food: " + std::to_string(food_cnt), static_cast<float>(sx + 20), static_cast<float>(y), 12.0f, Color{255, 130, 130, 255});
+    DrawCrispText("Water: " + std::to_string(water_cnt), static_cast<float>(sx + 145), static_cast<float>(y), 12.0f, Color{160, 200, 250, 255});
+    y += 16;
+
+    // Row 4: Average Age
     std::ostringstream ss_age;
     ss_age << "Avg Age: " << std::fixed << std::setprecision(1) << sim.AverageAge() << " yrs";
-    DrawCrispText(ss_age.str(), static_cast<float>(sx + 145), static_cast<float>(y), 11.5f, Color{180, 185, 200, 255});
+    DrawCrispText(ss_age.str(), static_cast<float>(sx + 20), static_cast<float>(y), 12.0f, Color{180, 185, 200, 255});
     y += 18;
 
     // Real-Time Demographic Dynamic Graph (Below the Two Columns)
