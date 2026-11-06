@@ -623,6 +623,251 @@ TEST_CASE(TC_UI_01_Sidebar_Vertical_Bounds) {
     CHECK_TRUE(max_y_with_toast < sim::WINDOW_HEIGHT_PX - 200);
 }
 
+TEST_CASE(TC_UI_02_EndGameModal_Geometry) {
+    constexpr int mw = 520;
+    constexpr int mh = 380;
+    constexpr int mx = (sim::PLAYFIELD_WIDTH_PX - mw) / 2;
+    constexpr int my = (sim::PLAYFIELD_HEIGHT_PX - mh) / 2;
+
+    CHECK_EQ(mx, 240);
+    CHECK_EQ(my, 310);
+    CHECK_TRUE(mx >= 0 && mx + mw <= sim::PLAYFIELD_WIDTH_PX);
+    CHECK_TRUE(my >= 0 && my + mh <= sim::PLAYFIELD_HEIGHT_PX);
+}
+
+TEST_CASE(TC_STAT_01_InitialSeedCounts) {
+    Simulation sim(123);
+    CHECK_EQ(sim.TotalOrganismsEver(), 2ULL);
+    CHECK_EQ(sim.TotalMalesEver(), 1ULL);
+    CHECK_EQ(sim.TotalFemalesEver(), 1ULL);
+}
+
+TEST_CASE(TC_STAT_02_ManualPlacementIncrements) {
+    Simulation sim(123);
+    uint64_t initial_total = sim.TotalOrganismsEver();
+    uint64_t initial_m = sim.TotalMalesEver();
+    uint64_t initial_f = sim.TotalFemalesEver();
+
+    // Place food and water - should NOT increment lifetime organism counters
+    for (int x = 0; x < GRID_WIDTH; ++x) {
+        if (sim.GetGrid().CanPlace(x, 0, 1, 1)) {
+            CHECK_TRUE(sim.ManualPlace(x, 0, EntityType::FOOD));
+            break;
+        }
+    }
+    for (int x = 0; x < GRID_WIDTH; ++x) {
+        if (sim.GetGrid().CanPlace(x, 1, 1, 1)) {
+            CHECK_TRUE(sim.ManualPlace(x, 1, EntityType::WATER));
+            break;
+        }
+    }
+    CHECK_EQ(sim.TotalOrganismsEver(), initial_total);
+    CHECK_EQ(sim.TotalMalesEver(), initial_m);
+    CHECK_EQ(sim.TotalFemalesEver(), initial_f);
+
+    // Place male organism
+    for (int x = 0; x < GRID_WIDTH; ++x) {
+        if (sim.GetGrid().CanPlace(x, 2, 1, 1)) {
+            CHECK_TRUE(sim.ManualPlace(x, 2, EntityType::ORGANISM, Gender::MALE));
+            break;
+        }
+    }
+    CHECK_EQ(sim.TotalOrganismsEver(), initial_total + 1);
+    CHECK_EQ(sim.TotalMalesEver(), initial_m + 1);
+    CHECK_EQ(sim.TotalFemalesEver(), initial_f);
+
+    // Place female organism
+    for (int x = 0; x < GRID_WIDTH; ++x) {
+        if (sim.GetGrid().CanPlace(x, 3, 1, 1)) {
+            CHECK_TRUE(sim.ManualPlace(x, 3, EntityType::ORGANISM, Gender::FEMALE));
+            break;
+        }
+    }
+    CHECK_EQ(sim.TotalOrganismsEver(), initial_total + 2);
+    CHECK_EQ(sim.TotalMalesEver(), initial_m + 1);
+    CHECK_EQ(sim.TotalFemalesEver(), initial_f + 1);
+}
+
+TEST_CASE(TC_STAT_03_OffspringBirthIncrements) {
+    Simulation sim(123);
+    uint64_t before_total = sim.TotalOrganismsEver();
+    uint64_t before_m = sim.TotalMalesEver();
+    uint64_t before_f = sim.TotalFemalesEver();
+
+    // Directly trigger a birth by setting a female organism to gestating with remaining timer 0.05s
+    Organism* female = nullptr;
+    for (auto& org : sim.GetEntities().GetOrganisms()) {
+        if (org.alive && org.gender == Gender::FEMALE) {
+            female = &org;
+            break;
+        }
+    }
+    CHECK_TRUE(female != nullptr);
+    female->gestating = true;
+    female->gestation_timer = 0.05f;
+
+    // Step simulation enough to trigger birth
+    sim.Step(0.1f);
+
+    CHECK_EQ(sim.TotalOrganismsEver(), before_total + 1);
+    CHECK_TRUE(sim.TotalMalesEver() == before_m + 1 || sim.TotalFemalesEver() == before_f + 1);
+}
+
+TEST_CASE(TC_STAT_04_DeathDoesNotDecrementCumulative) {
+    Simulation sim(123);
+    uint64_t initial_total = sim.TotalOrganismsEver();
+    uint64_t initial_m = sim.TotalMalesEver();
+    uint64_t initial_f = sim.TotalFemalesEver();
+
+    // Kill one organism by reducing life_force to 0
+    auto& orgs = sim.GetEntities().GetOrganisms();
+    CHECK_TRUE(!orgs.empty());
+    orgs[0].life_force = 0.0f;
+    orgs[0].alive = false;
+
+    // Step simulation to trigger RemoveDeadEntities
+    sim.Step(0.1f);
+
+    // Active count must be lower, but cumulative lifetime counters must remain invariant
+    CHECK_EQ(sim.GetEntities().ActiveOrganismCount(), 1ULL);
+    CHECK_EQ(sim.TotalOrganismsEver(), initial_total);
+    CHECK_EQ(sim.TotalMalesEver(), initial_m);
+    CHECK_EQ(sim.TotalFemalesEver(), initial_f);
+}
+
+TEST_CASE(TC_STAT_05_ResetClearsAndReseeds) {
+    Simulation sim(123);
+    for (int x = 0; x < 5; ++x) {
+        sim.ManualPlace(x, 5, EntityType::ORGANISM, Gender::MALE);
+    }
+    CHECK_TRUE(sim.TotalOrganismsEver() > 2);
+
+    sim.Reset();
+    CHECK_EQ(sim.TotalOrganismsEver(), 2ULL);
+    CHECK_EQ(sim.TotalMalesEver(), 1ULL);
+    CHECK_EQ(sim.TotalFemalesEver(), 1ULL);
+}
+
+TEST_CASE(TC_SAVE_03_CumulativeCountersSerializedAndRestored) {
+    const std::string save_path = "test_cumulative_save.json";
+    std::remove(save_path.c_str());
+
+    {
+        Simulation sim1(456);
+        for (int x = 0; x < 3; ++x) {
+            sim1.ManualPlace(x, 10, EntityType::ORGANISM, Gender::MALE);
+        }
+        for (int x = 0; x < 2; ++x) {
+            sim1.ManualPlace(x, 12, EntityType::ORGANISM, Gender::FEMALE);
+        }
+        CHECK_EQ(sim1.TotalOrganismsEver(), 7ULL);
+        CHECK_EQ(sim1.TotalMalesEver(), 4ULL);
+        CHECK_EQ(sim1.TotalFemalesEver(), 3ULL);
+        CHECK_TRUE(sim1.SaveState(save_path));
+    }
+
+    {
+        Simulation sim2;
+        CHECK_TRUE(sim2.LoadState(save_path));
+        CHECK_EQ(sim2.TotalOrganismsEver(), 7ULL);
+        CHECK_EQ(sim2.TotalMalesEver(), 4ULL);
+        CHECK_EQ(sim2.TotalFemalesEver(), 3ULL);
+    }
+
+    std::remove(save_path.c_str());
+}
+
+TEST_CASE(TC_SAVE_04_BackwardCompatibleMissingCounters) {
+    const std::string legacy_path = "test_legacy_save.json";
+    std::remove(legacy_path.c_str());
+
+    // Construct a minimal legacy JSON file without the cumulative counters
+    {
+        std::ofstream out(legacy_path);
+        out << "{\n"
+            << "  \"version\": 1,\n"
+            << "  \"step_count\": 50,\n"
+            << "  \"step_accumulator\": 0.0,\n"
+            << "  \"remaining_males\": 8,\n"
+            << "  \"remaining_females\": 8,\n"
+            << "  \"resource_spawn_timer\": 45.0,\n"
+            << "  \"status\": 0,\n"
+            << "  \"next_id\": 10,\n"
+            << "  \"history\": [],\n"
+            << "  \"resources\": [],\n"
+            << "  \"organisms\": [\n"
+            << "    {\"id\": 1, \"x\": 10, \"y\": 10, \"w\": 1, \"h\": 1, \"gender\": 0, \"life_force\": 100.0, \"hunger\": 10.0, \"thirst\": 10.0, \"calories\": 40, \"lifetime_calories\": 0, \"age\": 1, \"scent\": 10, \"sight_range\": 4, \"smell_range\": 6, \"damage\": 0, \"gestating\": false, \"gestation_timer\": 0.0, \"father_id\": 0, \"father_scent\": 0, \"father_sight_range\": 0, \"father_smell_range\": 0, \"age_timer\": 0.0, \"step_cooldown\": 0.0, \"current_state\": 0, \"alive\": true},\n"
+            << "    {\"id\": 2, \"x\": 20, \"y\": 20, \"w\": 1, \"h\": 1, \"gender\": 1, \"life_force\": 100.0, \"hunger\": 10.0, \"thirst\": 10.0, \"calories\": 40, \"lifetime_calories\": 0, \"age\": 1, \"scent\": 14, \"sight_range\": 4, \"smell_range\": 6, \"damage\": 0, \"gestating\": false, \"gestation_timer\": 0.0, \"father_id\": 0, \"father_scent\": 0, \"father_sight_range\": 0, \"father_smell_range\": 0, \"age_timer\": 0.0, \"step_cooldown\": 0.0, \"current_state\": 0, \"alive\": true}\n"
+            << "  ]\n"
+            << "}\n";
+    }
+
+    Simulation sim;
+    CHECK_TRUE(sim.LoadState(legacy_path));
+    // Must gracefully fall back to active counts (2 total: 1 male, 1 female)
+    CHECK_EQ(sim.TotalOrganismsEver(), 2ULL);
+    CHECK_EQ(sim.TotalMalesEver(), 1ULL);
+    CHECK_EQ(sim.TotalFemalesEver(), 1ULL);
+
+    std::remove(legacy_path.c_str());
+}
+
+TEST_CASE(TC_STAT_06_OldestOrganismAgeBaseline) {
+    Simulation sim(123);
+    CHECK_EQ(sim.OldestOrganismAge(), 1);
+}
+
+TEST_CASE(TC_STAT_07_OldestOrganismAgeProgressionAndMortality) {
+    Simulation sim(123);
+    CHECK_EQ(sim.OldestOrganismAge(), 1);
+
+    // Artificially advance an organism close to aging threshold
+    auto& orgs = sim.GetEntities().GetOrganisms();
+    CHECK_TRUE(!orgs.empty());
+    orgs[0].age = 5;
+    orgs[0].age_timer = sim::AGING_INTERVAL - 0.5f;
+
+    // Step 1 second so aging transition fires (5 -> 6)
+    sim.Step(1.0f);
+
+    CHECK_EQ(sim.OldestOrganismAge(), 6);
+    int max_age_recorded = sim.OldestOrganismAge();
+
+    // Kill the oldest organism
+    CHECK_TRUE(!sim.GetEntities().GetOrganisms().empty());
+    sim.GetEntities().GetOrganisms()[0].life_force = 0.0f;
+    sim.GetEntities().GetOrganisms()[0].alive = false;
+    sim.Step(0.1f);
+
+    // Oldest organism age must remain invariant despite death of the record holder
+    CHECK_EQ(sim.OldestOrganismAge(), max_age_recorded);
+}
+
+TEST_CASE(TC_SAVE_05_OldestOrganismAgeSerialization) {
+    const std::string save_path = "test_oldest_age_save.json";
+    std::remove(save_path.c_str());
+
+    {
+        Simulation sim1(789);
+        auto& orgs = sim1.GetEntities().GetOrganisms();
+        CHECK_TRUE(!orgs.empty());
+        orgs[0].age = 9;
+        orgs[0].age_timer = sim::AGING_INTERVAL - 0.5f;
+        sim1.Step(1.0f);
+        CHECK_EQ(sim1.OldestOrganismAge(), 10);
+        int expected_age = sim1.OldestOrganismAge();
+        CHECK_TRUE(sim1.SaveState(save_path));
+
+        Simulation sim2;
+        CHECK_TRUE(sim2.LoadState(save_path));
+        CHECK_EQ(sim2.OldestOrganismAge(), expected_age);
+    }
+
+    std::remove(save_path.c_str());
+}
+
+
+
 
 
 

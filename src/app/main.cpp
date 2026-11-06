@@ -5,7 +5,24 @@
 #include "app/IconData.hpp"
 #include "raylib.h"
 
-int main() {
+int main(int argc, char* argv[]) {
+    std::string screenshot_path;
+    bool screenshot_mode = false;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == "--screenshot") {
+            screenshot_mode = true;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                screenshot_path = argv[i + 1];
+            } else {
+                screenshot_path = "assets/screenshots/preview.png";
+            }
+        }
+    }
+
+    if (screenshot_mode) {
+        SetConfigFlags(FLAG_WINDOW_HIDDEN);
+    }
+
     InitWindow(sim::WINDOW_WIDTH_PX, sim::WINDOW_HEIGHT_PX, "Autonomous 2D Multi-Tile Organism Simulation");
     SetTargetFPS(60);
 
@@ -49,10 +66,19 @@ int main() {
 
     constexpr float FIXED_TIMESTEP = 0.05f; // 20 simulation updates per second
     float accumulator = 0.0f;
+    int screenshot_frame = 0;
 
     while (!WindowShouldClose()) {
         float frame_dt = GetFrameTime();
         if (frame_dt > 0.25f) frame_dt = 0.25f; // Prevent spiral of death
+
+        if (screenshot_mode) {
+            ++screenshot_frame;
+            if (screenshot_frame == 1) {
+                simulation.ManualPlace(48, 48, sim::EntityType::ORGANISM, sim::Gender::MALE);
+                simulation.ManualPlace(52, 52, sim::EntityType::ORGANISM, sim::Gender::FEMALE);
+            }
+        }
 
         // ---------------------------------------------------------------------
         // Input Handling
@@ -63,6 +89,7 @@ int main() {
 
         if (IsKeyPressed(KEY_R)) {
             simulation.Reset();
+            paused = false;
         }
 
         // Tool Selection
@@ -143,6 +170,15 @@ int main() {
             hovered_org = simulation.GetOrganismAt(hover_cell_x, hover_cell_y);
         }
 
+        if (screenshot_mode && !hovered_org) {
+            for (const auto& org : simulation.GetEntities().GetOrganisms()) {
+                if (org.alive) {
+                    hovered_org = &org;
+                    break;
+                }
+            }
+        }
+
         if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT) && mouse_in_playfield) {
             switch (active_tool) {
                 case sim::ActiveTool::FOOD:
@@ -163,12 +199,17 @@ int main() {
         // ---------------------------------------------------------------------
         // Simulation Tick
         // ---------------------------------------------------------------------
+        sim::GameStatus prev_status = simulation.GetGameStatus();
         if (!paused) {
             accumulator += frame_dt * time_scale;
             while (accumulator >= FIXED_TIMESTEP) {
                 simulation.Step(FIXED_TIMESTEP);
                 accumulator -= FIXED_TIMESTEP;
             }
+        }
+        sim::GameStatus curr_status = simulation.GetGameStatus();
+        if (curr_status != sim::GameStatus::ONGOING && prev_status == sim::GameStatus::ONGOING) {
+            paused = true;
         }
 
         // ---------------------------------------------------------------------
@@ -185,9 +226,21 @@ int main() {
         EndMode2D();
         EndScissorMode();
 
+        ui.DrawEndGameModal(simulation);
+
         ui.DrawSidebar(simulation, active_tool, time_scale, paused, hovered_org, notification_msg);
 
         EndDrawing();
+
+        if (screenshot_mode) {
+            if (screenshot_frame == 30) {
+                Image scr = LoadImageFromScreen();
+                ExportImage(scr, screenshot_path.c_str());
+                UnloadImage(scr);
+            } else if (screenshot_frame > 30) {
+                break;
+            }
+        }
     }
 
     ui.Cleanup();

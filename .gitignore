@@ -1,5 +1,9 @@
 # Planning and agent lifecycle artifacts
 .planning/
+memory/
+MEMORY.md
+SOUL.md
+USER.md
 
 # Build directories
 build/

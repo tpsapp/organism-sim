@@ -365,4 +365,86 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
     }
 }
 
+void UI::DrawEndGameModal(const sim::Simulation& sim) {
+    sim::GameStatus status = sim.GetGameStatus();
+    if (status == sim::GameStatus::ONGOING) {
+        return;
+    }
+
+    // Semi-transparent backdrop over playfield
+    DrawRectangle(0, 0, sim::PLAYFIELD_WIDTH_PX, sim::PLAYFIELD_HEIGHT_PX, Color{0, 0, 0, 160});
+
+    // Centered modal dimensions
+    constexpr int mw = 520;
+    constexpr int mh = 380;
+    constexpr int mx = (sim::PLAYFIELD_WIDTH_PX - mw) / 2;
+    constexpr int my = (sim::PLAYFIELD_HEIGHT_PX - mh) / 2;
+
+    bool is_victory = (status == sim::GameStatus::VICTORY);
+    Color accent_color = is_victory ? Color{245, 194, 66, 255} : Color{244, 67, 54, 255};
+    Color header_bg = is_victory ? Color{38, 34, 18, 255} : Color{42, 20, 22, 255};
+
+    const char* title_text = is_victory ? "SIMULATION VICTORY!" : "COLONY EXTINCTION (DEFEAT)";
+    const char* subtitle_text = is_victory ? "Colony achieved dominant biomass threshold."
+                                           : "All living organisms have perished.";
+
+    // Card background & border
+    DrawRectangle(mx, my, mw, mh, Color{20, 24, 34, 250});
+    DrawRectangleLinesEx(Rectangle{static_cast<float>(mx), static_cast<float>(my),
+                                   static_cast<float>(mw), static_cast<float>(mh)},
+                         2.0f, accent_color);
+
+    // Header banner
+    DrawRectangle(mx + 2, my + 2, mw - 4, 70, header_bg);
+    DrawLine(mx, my + 72, mx + mw, my + 72, accent_color);
+    DrawCrispText(title_text, static_cast<float>(mx + 30), static_cast<float>(my + 16), 22.0f, accent_color);
+    DrawCrispText(subtitle_text, static_cast<float>(mx + 30), static_cast<float>(my + 46), 14.0f, Color{200, 205, 215, 255});
+
+    // Summary sub-box
+    int sy = my + 88;
+    DrawCrispText("LIFETIME SIMULATION SUMMARY", static_cast<float>(mx + 30), static_cast<float>(sy), 13.5f, Color{130, 140, 160, 255});
+    sy += 22;
+
+    constexpr int box_h = 162;
+    DrawRectangle(mx + 25, sy, mw - 50, box_h, Color{14, 17, 24, 240});
+    DrawRectangleLines(mx + 25, sy, mw - 50, box_h, Color{45, 52, 70, 255});
+
+    int row_y = sy + 12;
+    // Row 1: Total Steps
+    DrawCrispText("Total Steps Elapsed:", static_cast<float>(mx + 45), static_cast<float>(row_y), 15.0f, Color{220, 225, 235, 255});
+    DrawCrispText(std::to_string(sim.GetStepCount()), static_cast<float>(mx + 330), static_cast<float>(row_y), 15.0f, Color{255, 255, 255, 255});
+    row_y += 27;
+
+    // Row 2: Total Organisms Ever Created
+    DrawCrispText("Total Organisms Created:", static_cast<float>(mx + 45), static_cast<float>(row_y), 15.0f, Color{220, 225, 235, 255});
+    DrawCrispText(std::to_string(sim.TotalOrganismsEver()), static_cast<float>(mx + 330), static_cast<float>(row_y), 15.0f, Color{100, 215, 255, 255});
+    row_y += 26;
+
+    // Row 3: Total Males Ever Created
+    DrawCrispText("  * Total Males:", static_cast<float>(mx + 45), static_cast<float>(row_y), 14.5f, Color{170, 180, 200, 255});
+    DrawCrispText(std::to_string(sim.TotalMalesEver()), static_cast<float>(mx + 330), static_cast<float>(row_y), 14.5f, Color{90, 160, 255, 255});
+    row_y += 25;
+
+    // Row 4: Total Females Ever Created
+    DrawCrispText("  * Total Females:", static_cast<float>(mx + 45), static_cast<float>(row_y), 14.5f, Color{170, 180, 200, 255});
+    DrawCrispText(std::to_string(sim.TotalFemalesEver()), static_cast<float>(mx + 330), static_cast<float>(row_y), 14.5f, Color{255, 215, 75, 255});
+    row_y += 26;
+
+    // Row 5: Oldest Organism Age
+    int oldest_age = sim.OldestOrganismAge();
+    std::string age_str = std::to_string(oldest_age) + (oldest_age == 1 ? " yr" : " yrs");
+    DrawCrispText("Oldest Organism Age:", static_cast<float>(mx + 45), static_cast<float>(row_y), 15.0f, Color{220, 225, 235, 255});
+    DrawCrispText(age_str, static_cast<float>(mx + 330), static_cast<float>(row_y), 15.0f, Color{180, 240, 180, 255});
+
+    // Divider & Footer actions
+    int fy = sy + box_h + 16;
+    DrawLine(mx + 25, fy, mx + mw - 25, fy, Color{45, 52, 70, 255});
+    fy += 12;
+
+    DrawCrispText("[R] Reset Simulation", static_cast<float>(mx + 35), static_cast<float>(fy), 14.0f, Color{80, 225, 120, 255});
+    DrawCrispText("[F9] Load Last Snapshot", static_cast<float>(mx + 285), static_cast<float>(fy), 14.0f, Color{130, 200, 255, 255});
+    fy += 22;
+    DrawCrispText("[Space] Toggle Pause to Inspect Grid", static_cast<float>(mx + 35), static_cast<float>(fy), 13.5f, Color{170, 175, 190, 255});
+}
+
 } // namespace app

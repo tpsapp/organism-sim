@@ -21,6 +21,10 @@ void Simulation::Reset() {
     remaining_females_ = MAX_MANUAL_FEMALES;
     status_ = GameStatus::ONGOING;
     population_history_.clear();
+    total_organisms_ever_ = 0;
+    total_males_ever_ = 0;
+    total_females_ever_ = 0;
+    oldest_organism_age_ = 0;
 
     std::uniform_real_distribution<float> spawn_dist(MIN_RESOURCE_SPAWN_INTERVAL, MAX_RESOURCE_SPAWN_INTERVAL);
     resource_spawn_timer_ = spawn_dist(rng_);
@@ -79,6 +83,7 @@ void Simulation::SeedInitialWorld() {
     if (m_pos.x >= 0) {
         uint32_t m_id = entity_mgr_.CreateOrganism(m_pos, Gender::MALE, 1, 1, 40, 10);
         grid_.Occupy(m_pos.x, m_pos.y, 1, 1, EntityType::ORGANISM, m_id);
+        RecordOrganismCreated(Gender::MALE);
     }
 
     // Place 1 Initial Female Organism
@@ -86,6 +91,7 @@ void Simulation::SeedInitialWorld() {
     if (f_pos.x >= 0) {
         uint32_t f_id = entity_mgr_.CreateOrganism(f_pos, Gender::FEMALE, 1, 1, 40, 14);
         grid_.Occupy(f_pos.x, f_pos.y, 1, 1, EntityType::ORGANISM, f_id);
+        RecordOrganismCreated(Gender::FEMALE);
     }
 }
 
@@ -151,6 +157,7 @@ void Simulation::UpdateMetabolismAndGrowth(float dt) {
             org.age_timer -= AGING_INTERVAL;
             if (org.age < 100) {
                 org.age += 1;
+                oldest_organism_age_ = std::max(oldest_organism_age_, org.age);
             }
         }
 
@@ -224,7 +231,10 @@ void Simulation::Step(float dt) {
         }
     }
     for (uint32_t id : active_ids) {
-        ai_engine_.UpdateAI(id, entity_mgr_, grid_, dt, rng_);
+        auto born_gender = ai_engine_.UpdateAI(id, entity_mgr_, grid_, dt, rng_);
+        if (born_gender.has_value()) {
+            RecordOrganismCreated(*born_gender);
+        }
     }
 
     // 3. Periodic resource spawning
@@ -261,6 +271,7 @@ bool Simulation::ManualPlace(int cell_x, int cell_y, EntityType type, Gender gen
         }
         uint32_t id = entity_mgr_.CreateOrganism({cell_x, cell_y}, gender, 1, 1, 40);
         grid_.Occupy(cell_x, cell_y, 1, 1, EntityType::ORGANISM, id);
+        RecordOrganismCreated(gender);
         return true;
     } else if (type == EntityType::FOOD || type == EntityType::WATER) {
         uint32_t id = entity_mgr_.CreateResource({cell_x, cell_y}, type);
@@ -338,6 +349,10 @@ bool Simulation::SaveState(const std::string& filepath) const {
     out << "  \"resource_spawn_timer\": " << resource_spawn_timer_ << ",\n";
     out << "  \"status\": " << static_cast<int>(status_) << ",\n";
     out << "  \"next_id\": " << entity_mgr_.GetNextId() << ",\n";
+    out << "  \"total_organisms_ever\": " << total_organisms_ever_ << ",\n";
+    out << "  \"total_males_ever\": " << total_males_ever_ << ",\n";
+    out << "  \"total_females_ever\": " << total_females_ever_ << ",\n";
+    out << "  \"oldest_organism_age\": " << oldest_organism_age_ << ",\n";
 
     // Population history
     out << "  \"history\": [\n";
@@ -438,6 +453,26 @@ bool Simulation::LoadState(const std::string& filepath) {
     uint32_t saved_next_id = root["next_id"].as_uint32();
     entity_mgr_.SetNextId(saved_next_id > 0 ? saved_next_id : 1);
 
+    bool has_cumulative_stats = root.contains("total_organisms_ever") &&
+                                root.contains("total_males_ever") &&
+                                root.contains("total_females_ever");
+    if (has_cumulative_stats) {
+        total_organisms_ever_ = root["total_organisms_ever"].as_uint64();
+        total_males_ever_ = root["total_males_ever"].as_uint64();
+        total_females_ever_ = root["total_females_ever"].as_uint64();
+    } else {
+        total_organisms_ever_ = 0;
+        total_males_ever_ = 0;
+        total_females_ever_ = 0;
+    }
+
+    bool has_oldest_age = root.contains("oldest_organism_age");
+    if (has_oldest_age) {
+        oldest_organism_age_ = root["oldest_organism_age"].as_int();
+    } else {
+        oldest_organism_age_ = 0;
+    }
+
     population_history_.clear();
     const auto& hist_arr = root["history"].arr_val;
     for (const auto& sample_val : hist_arr) {
@@ -495,6 +530,24 @@ bool Simulation::LoadState(const std::string& filepath) {
         entity_mgr_.AddOrganism(org);
         if (org.alive) {
             grid_.Occupy(org.pos.x, org.pos.y, org.w, org.h, EntityType::ORGANISM, org.id);
+        }
+    }
+
+    if (!has_cumulative_stats) {
+        total_organisms_ever_ = entity_mgr_.ActiveOrganismCount();
+        total_males_ever_ = MaleCount();
+        total_females_ever_ = FemaleCount();
+    }
+
+    if (!has_oldest_age) {
+        oldest_organism_age_ = 0;
+        for (const auto& org : entity_mgr_.GetOrganisms()) {
+            if (org.alive) {
+                oldest_organism_age_ = std::max(oldest_organism_age_, org.age);
+            }
+        }
+        if (oldest_organism_age_ == 0 && !entity_mgr_.GetOrganisms().empty()) {
+            oldest_organism_age_ = 1;
         }
     }
 

@@ -41,10 +41,11 @@ A deterministic, multi-agent artificial life (A-life) simulation built in **C++2
 
 - **Multi-Tile Footprint Collision Engine:** Organisms occupy rectangular footprints ranging from $1 \times 1$ up to $4 \times 4$ cells with strict bounding-box collision handling.
 - **Pure Decoupled Architecture (`sim_core`):** Core mathematical and biological rules are compiled into a pure, headless static library completely isolated from GUI and window manager dependencies.
+- **Interactive Win/Loss Modal Notification:** Automatically detects victory (75%+ territorial dominance) and colony extinction (all organisms perished), halts the simulation, and displays a centered modal dialog with full lifetime metrics: total steps elapsed, total organisms ever created, male and female breakdowns, and the age of the oldest organism that ever existed.
 - **Real-Time Sidebar Inspector:** Hover over any organism on the playfield to inspect detailed real-time telemetry (ID, gender, dimensions, life force, satiety, age, damage, scent, FSM state, and gestation countdown).
 - **Embedded Zero-Dependency Assets:** TrueType vector typography (Liberation Sans) and application icons are embedded directly into C++ header byte arrays, guaranteeing reliable runtime rendering without filesystem dependencies.
 - **Cross-Platform Launcher Branding:** Features embedded Windows PE resource icons (`.ico` / `.rc`) and FreeDesktop compliant launcher integration (`.desktop`).
-- **Memory-Safe Verification:** 100% test pass rate across 61 automated unit and integration tests under AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan).
+- **Memory-Safe Verification:** 100% test pass rate across 82 automated unit and integration tests (440 assertions) under AddressSanitizer (ASan) and UndefinedBehaviorSanitizer (UBSan).
 
 ---
 
@@ -155,6 +156,7 @@ organism-sim/
 │   │   └── Simulation.hpp         # Master simulation loop, timers, step counter telemetry
 │   └── app/                       # Presentation & Raylib Graphical Application
 │       ├── IconData.hpp           # Embedded 32-bit RGBA window icon byte stream
+│       ├── LayoutMetrics.hpp      # Responsive typography scales & sidebar layout metrics
 │       ├── Renderer.hpp           # Playfield tile, gridline & entity drawing
 │       └── UI.hpp                 # Sidebar HUD, vector font management & inspector
 ├── src/
@@ -305,7 +307,7 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug -DENABLE_SANITIZERS=ON
 # 2. Build the headless test runner
 cmake --build build --target sim_tests
 
-# 3. Execute the full test suite (61 test cases, 309 assertions)
+# 3. Execute the full test suite (82 test cases, 440 assertions)
 ./build/sim_tests
 ```
 
@@ -317,10 +319,10 @@ Sample output:
 [ RUN      ] TC_GRID_01_HappyPath_1x1
 [       OK ] TC_GRID_01_HappyPath_1x1
 ...
-[ RUN      ] TC_BUILD_01_CMakeLists_Targets_Configured
-[       OK ] TC_BUILD_01_CMakeLists_Targets_Configured
+[ RUN      ] TC_SAVE_05_OldestOrganismAgeSerialization
+[       OK ] TC_SAVE_05_OldestOrganismAgeSerialization
 =======================================
- Test Summary: 61 passed, 0 failed (309 total assertions)
+ Test Summary: 82 passed, 0 failed (440 total assertions)
 =======================================
 ```
 

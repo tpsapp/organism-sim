@@ -75,9 +75,9 @@ Organism AIEngine::CreateOffspring(const Organism& mother, const Organism& fathe
     return child;
 }
 
-void AIEngine::UpdateAI(Organism& org, EntityManager& entity_mgr, GridMatrix& grid,
-                        float dt, std::mt19937& rng) {
-    UpdateAI(org.id, entity_mgr, grid, dt, rng);
+std::optional<Gender> AIEngine::UpdateAI(Organism& org, EntityManager& entity_mgr, GridMatrix& grid,
+                                        float dt, std::mt19937& rng) {
+    return UpdateAI(org.id, entity_mgr, grid, dt, rng);
 }
 
 namespace {
@@ -333,10 +333,10 @@ PathResult FindReachableMate(const Organism& org, const EntityManager& em, const
 
 } // anonymous namespace
 
-void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& grid,
-                        float dt, std::mt19937& rng) {
+std::optional<Gender> AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& grid,
+                                        float dt, std::mt19937& rng) {
     Organism* p_org = entity_mgr.GetOrganism(org_id);
-    if (!p_org || !p_org->alive) return;
+    if (!p_org || !p_org->alive) return std::nullopt;
 
     // Handle gestation timer if female
     if (p_org->gestating) {
@@ -344,6 +344,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
         if (p_org->gestation_timer <= 0.0f) {
             // Find adjacent empty 1x1 cell
             bool birthed = false;
+            std::optional<Gender> birthed_child_gender = std::nullopt;
             static const Vector2i kOffsets[8] = {
                 {0, -1}, {0, 1}, {-1, 0}, {1, 0},
                 {-1, -1}, {1, -1}, {-1, 1}, {1, 1}
@@ -361,7 +362,9 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
                         father_info.sight_range = mother_copy.father_sight_range;
                         father_info.smell_range = mother_copy.father_smell_range;
 
-                        *child = CreateOffspring(mother_copy, father_info, birth_pos, child_id, rng);
+                        Organism offspring = CreateOffspring(mother_copy, father_info, birth_pos, child_id, rng);
+                        birthed_child_gender = offspring.gender;
+                        *child = offspring;
                         grid.Occupy(birth_pos.x, birth_pos.y, 1, 1, EntityType::ORGANISM, child_id);
                     }
                     p_org = entity_mgr.GetOrganism(org_id);
@@ -381,20 +384,20 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
             } else {
                 p_org = entity_mgr.GetOrganism(org_id);
                 if (p_org) p_org->step_cooldown = BASE_STEP_INTERVAL;
-                return;
+                return birthed_child_gender;
             }
         }
     }
 
     p_org = entity_mgr.GetOrganism(org_id);
-    if (!p_org || !p_org->alive) return;
+    if (!p_org || !p_org->alive) return std::nullopt;
     auto& org = *p_org;
 
     // Update step cooldown
     if (org.step_cooldown > 0.0f) {
         org.step_cooldown -= dt;
         if (org.step_cooldown > 0.0f) {
-            return;
+            return std::nullopt;
         }
     }
 
@@ -442,7 +445,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
                         org.lifetime_calories += 35;
                         org.life_force = std::min(100.0f, org.life_force + 15.0f);
                         org.step_cooldown = BASE_STEP_INTERVAL;
-                        return;
+                        return std::nullopt;
                     } else {
                         prey->step_cooldown = BASE_STEP_INTERVAL * 0.5f;
                     }
@@ -499,7 +502,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
                 }
                 res->alive = false;
                 grid.Vacate(res->pos.x, res->pos.y, 1, 1);
-                return;
+                return std::nullopt;
             }
         } else if (target_mate_id != 0) {
             Organism* mate = entity_mgr.GetOrganism(target_mate_id);
@@ -514,7 +517,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
                     female->father_sight_range = male->sight_range;
                     female->father_smell_range = male->smell_range;
                 }
-                return;
+                return std::nullopt;
             }
         }
     }
@@ -528,7 +531,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
             grid.Occupy(org.pos.x, org.pos.y, org.w, org.h, EntityType::ORGANISM, org.id);
             org.calories = std::max(0, org.calories - CALORIE_MOVE_COST);
             org.step_cooldown = BASE_STEP_INTERVAL * (org.calories == 0 ? 2.0f : 1.0f);
-            return;
+            return std::nullopt;
         }
     }
 
@@ -536,7 +539,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
     std::uniform_int_distribution<int> dir_dist(-1, 1);
     Vector2i desired_dir{dir_dist(rng), dir_dist(rng)};
     if (desired_dir.x == 0 && desired_dir.y == 0) {
-        return;
+        return std::nullopt;
     }
 
     static const Vector2i kAllDirs[8] = {
@@ -561,6 +564,7 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
             break;
         }
     }
+    return std::nullopt;
 }
 
 } // namespace sim

@@ -34,6 +34,21 @@ public:
     [[nodiscard]] size_t GestatingCount() const noexcept;
     [[nodiscard]] float AverageAge() const noexcept;
 
+    [[nodiscard]] uint64_t TotalOrganismsEver() const noexcept { return total_organisms_ever_; }
+    [[nodiscard]] uint64_t TotalMalesEver() const noexcept { return total_males_ever_; }
+    [[nodiscard]] uint64_t TotalFemalesEver() const noexcept { return total_females_ever_; }
+    [[nodiscard]] int OldestOrganismAge() const noexcept { return oldest_organism_age_; }
+
+    void RecordOrganismCreated(Gender gender) noexcept {
+        ++total_organisms_ever_;
+        if (gender == Gender::MALE) {
+            ++total_males_ever_;
+        } else {
+            ++total_females_ever_;
+        }
+        oldest_organism_age_ = std::max(oldest_organism_age_, 1);
+    }
+
     [[nodiscard]] const Organism* GetOrganismAt(int cell_x, int cell_y) const noexcept;
     [[nodiscard]] uint64_t GetStepCount() const noexcept { return step_count_; }
     [[nodiscard]] const std::vector<PopulationSample>& GetPopulationHistory() const noexcept { return population_history_; }
@@ -60,6 +75,11 @@ private:
     float resource_spawn_timer_{60.0f};
     GameStatus status_{GameStatus::ONGOING};
     std::vector<PopulationSample> population_history_;
+
+    uint64_t total_organisms_ever_{0};
+    uint64_t total_males_ever_{0};
+    uint64_t total_females_ever_{0};
+    int oldest_organism_age_{0};
 };
 
 } // namespace sim

@@ -4,6 +4,7 @@
 #include "sim/Entity.hpp"
 #include "sim/GridMatrix.hpp"
 #include "sim/EntityManager.hpp"
+#include <optional>
 #include <random>
 
 namespace sim {
@@ -20,8 +21,8 @@ public:
 
     static bool AreScentsCompatible(uint16_t scent_a, uint16_t scent_b) noexcept;
 
-    void UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& grid, float dt, std::mt19937& rng);
-    void UpdateAI(Organism& org, EntityManager& entity_mgr, GridMatrix& grid, float dt, std::mt19937& rng);
+    std::optional<Gender> UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& grid, float dt, std::mt19937& rng);
+    std::optional<Gender> UpdateAI(Organism& org, EntityManager& entity_mgr, GridMatrix& grid, float dt, std::mt19937& rng);
 
     static Organism CreateOffspring(const Organism& mother, const Organism& father, Vector2i birth_pos, uint32_t id, std::mt19937& rng);
 };
