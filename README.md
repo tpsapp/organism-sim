@@ -89,28 +89,30 @@ As organisms consume food and survive across seasons, their lifetime calorie cou
 │                                                        │  A-Life Engine       │
 │                                                        │  ──────────────────  │
 │                                                        │  STATUS: RUNNING     │
-│                 100 x 100 PLAYFIELD                    │  Time Scale: 1x      │
-│                 (1000 x 1000 px)                       │  Steps: 1,420        │
-│                                                        │  ──────────────────  │
-│  - Food: Burgundy Red tiles                            │  GRID OCCUPANCY      │
-│  - Water: Slate Gray tiles                             │  1,250 / 10,000 (12%)│
-│  - Males: Vibrant Blue (health-shaded)                 │  [████             ] │
-│  - Females: Vibrant Yellow (health-shaded)             │  ──────────────────  │
-│  - Hover: Dual Gold/White highlight box                │  POPULATION STATS    │
-│                                                        │  Total: 84           │
-│                                                        │  Males: 42           │
-│                                                        │  Females: 42         │
+│                 100 x 100 PLAYFIELD                    │  1x | Step 1,420     │
+│                 (1000 x 1000 px)                       │  ──────────────────  │
+│                                                        │  GRID OCCUPANCY      │
+│  - Food: Burgundy Red tiles                            │  1,250 (12.5%)       │
+│  - Water: Slate Gray tiles                             │  [████             ] │
+│  - Males: Vibrant Blue (health-shaded)                 │  ──────────────────  │
+│  - Females: Vibrant Yellow (health-shaded)             │  POPULATION STATS    │
+│  - Hover: Dual Gold/White highlight box                │  Total: 84 | Gest: 6 │
+│  - Sensory: Cyan Sight & Violet Smell Boxes            │  Males: 42 | Fem: 42 │
+│                                                        │  [Sparkline Graph]   │
 │                                                        │  ──────────────────  │
 │                                                        │  MANUAL PLACEMENT    │
-│                                                        │  [■] [1] Food        │
-│                                                        │  [■] [2] Water       │
-│                                                        │  [■] [3] Male (10/10)│
-│                                                        │  [■] [4] Female (10) │
+│                                                        │  [■][1]Food [■][2]Wtr│
+│                                                        │  [■][3]Male [■][4]Fem│
+│                                                        │  ──────────────────  │
+│                                                        │  CONTROLS (2-Col)    │
 │                                                        │  ──────────────────  │
 │                                                        │  ORGANISM INSPECTOR  │
 │                                                        │  ID #14 (Female)     │
 │                                                        │  Size: 2x2 | Dmg: 1  │
-│                                                        │  Life: 94.2/100      │
+│                                                        │  Life: 94.2/100 [██] │
+│                                                        │  Hunger: 8/10|Thirst │
+│                                                        │  State: Wandering    │
+│                                                        │  Gestation: None     │
 └────────────────────────────────────────────────────────┴──────────────────────┘
 ```
 

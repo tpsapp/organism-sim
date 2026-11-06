@@ -1,6 +1,7 @@
 #include "TestHarness.hpp"
 #include "sim/Simulation.hpp"
 #include "app/IconData.hpp"
+#include "app/LayoutMetrics.hpp"
 #include <fstream>
 #include <sstream>
 
@@ -610,6 +611,18 @@ TEST_CASE(TC_SAVE_02_Invalid_Or_Missing_File) {
     CHECK_FALSE(sim.LoadState(corrupt_path));
     std::remove(corrupt_path.c_str());
 }
+
+TEST_CASE(TC_UI_01_Sidebar_Vertical_Bounds) {
+    // Assert that the full HUD layout (including inspector telemetry and notification toast)
+    // strictly remains within the 1000px window boundary with at least 150px clearance.
+    int max_y_normal = app::SidebarLayout::CalculateContentBottomY(false, true);
+    int max_y_with_toast = app::SidebarLayout::CalculateContentBottomY(true, true);
+
+    CHECK_TRUE(max_y_normal <= 750);
+    CHECK_TRUE(max_y_with_toast <= 750);
+    CHECK_TRUE(max_y_with_toast < sim::WINDOW_HEIGHT_PX - 200);
+}
+
 
 
 
