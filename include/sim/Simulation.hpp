@@ -36,6 +36,10 @@ public:
 
     [[nodiscard]] const Organism* GetOrganismAt(int cell_x, int cell_y) const noexcept;
     [[nodiscard]] uint64_t GetStepCount() const noexcept { return step_count_; }
+    [[nodiscard]] const std::vector<PopulationSample>& GetPopulationHistory() const noexcept { return population_history_; }
+
+    [[nodiscard]] bool SaveState(const std::string& filepath) const;
+    bool LoadState(const std::string& filepath);
 
     void SetGameStatus(GameStatus s) noexcept { status_ = s; }
 
@@ -55,6 +59,7 @@ private:
     int remaining_females_{MAX_MANUAL_FEMALES};
     float resource_spawn_timer_{60.0f};
     GameStatus status_{GameStatus::ONGOING};
+    std::vector<PopulationSample> population_history_;
 };
 
 } // namespace sim

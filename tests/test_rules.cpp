@@ -404,6 +404,216 @@ TEST_CASE(TC_BUILD_01_CMakeLists_Targets_Configured) {
     }
 }
 
+TEST_CASE(TC_CAM_01_WorldToScreenMapping) {
+    // Test Raylib Camera2D coordinate conversion logic
+    // Screen = (World - Target) * Zoom + Offset
+    // Inverse: World = (Screen - Offset) / Zoom + Target
+    float target_x = 500.0f;
+    float target_y = 500.0f;
+    float offset_x = 500.0f;
+    float offset_y = 500.0f;
+    float zoom = 2.0f;
+
+    auto screen_to_world = [&](float sx, float sy) -> std::pair<float, float> {
+        return {(sx - offset_x) / zoom + target_x, (sy - offset_y) / zoom + target_y};
+    };
+
+    // Center screen (500, 500) maps directly to center world (500, 500)
+    auto [wx_center, wy_center] = screen_to_world(500.0f, 500.0f);
+    CHECK_NEAR(wx_center, 500.0f, 0.001);
+    CHECK_NEAR(wy_center, 500.0f, 0.001);
+
+    // Screen point (600, 700) under 2x zoom:
+    // wx = (600 - 500) / 2 + 500 = 550
+    // wy = (700 - 500) / 2 + 500 = 600
+    auto [wx, wy] = screen_to_world(600.0f, 700.0f);
+    CHECK_NEAR(wx, 550.0f, 0.001);
+    CHECK_NEAR(wy, 600.0f, 0.001);
+
+    int cell_x = static_cast<int>(wx) / CELL_SIZE_PX;
+    int cell_y = static_cast<int>(wy) / CELL_SIZE_PX;
+    CHECK_EQ(cell_x, 55);
+    CHECK_EQ(cell_y, 60);
+}
+
+TEST_CASE(TC_SENSORY_01_ChebyshevRadiiBoundingBox) {
+    // 1x1 Organism at (10, 10) with sight_range=4, smell_range=6
+    Organism org_1x1;
+    org_1x1.pos = {10, 10};
+    org_1x1.w = 1;
+    org_1x1.h = 1;
+    org_1x1.sight_range = 4;
+    org_1x1.smell_range = 6;
+
+    int sight_min_x = org_1x1.pos.x - org_1x1.sight_range; // 6
+    int sight_max_x = org_1x1.pos.x + org_1x1.w - 1 + org_1x1.sight_range; // 14
+    CHECK_EQ(sight_min_x, 6);
+    CHECK_EQ(sight_max_x, 14);
+
+    int smell_min_x = org_1x1.pos.x - org_1x1.smell_range; // 4
+    int smell_max_x = org_1x1.pos.x + org_1x1.w - 1 + org_1x1.smell_range; // 16
+    CHECK_EQ(smell_min_x, 4);
+    CHECK_EQ(smell_max_x, 16);
+
+    // 3x3 Multi-Tile Organism at (40, 40)
+    Organism org_3x3;
+    org_3x3.pos = {40, 40};
+    org_3x3.w = 3;
+    org_3x3.h = 3;
+    org_3x3.sight_range = 4;
+    org_3x3.smell_range = 6;
+
+    int m_sight_min_x = org_3x3.pos.x - org_3x3.sight_range; // 36
+    int m_sight_max_x = org_3x3.pos.x + org_3x3.w - 1 + org_3x3.sight_range; // 46
+    CHECK_EQ(m_sight_min_x, 36);
+    CHECK_EQ(m_sight_max_x, 46);
+}
+
+TEST_CASE(TC_COMBAT_01_Predation_Kill) {
+    GridMatrix grid;
+    EntityManager em;
+
+    // Predator: 2x2 male at (50, 50), starving (hunger=1.0), damage=1
+    uint32_t pred_id = em.CreateOrganism({50, 50}, Gender::MALE, 2, 2, 20);
+    grid.Occupy(50, 50, 2, 2, EntityType::ORGANISM, pred_id);
+
+    // Prey: 1x1 female at (52, 50) (adjacent to predator right side), low HP (10.0)
+    uint32_t prey_id = em.CreateOrganism({52, 50}, Gender::FEMALE, 1, 1, 40);
+    grid.Occupy(52, 50, 1, 1, EntityType::ORGANISM, prey_id);
+
+    Organism* pred = em.GetOrganism(pred_id);
+    pred->hunger = 1.0f;
+    pred->thirst = 10.0f;
+    pred->calories = 10;
+    pred->life_force = 50.0f;
+
+    Organism* prey = em.GetOrganism(prey_id);
+    prey->life_force = 10.0f;
+
+    AIEngine ai;
+    std::mt19937 rng(42);
+
+    ai.UpdateAI(pred_id, em, grid, 0.1f, rng);
+
+    pred = em.GetOrganism(pred_id);
+    prey = em.GetOrganism(prey_id);
+
+    // Prey must be dead
+    CHECK_TRUE(prey == nullptr || !prey->alive);
+    CHECK_TRUE(grid.At(52, 50).type == EntityType::EMPTY);
+
+    // Predator gains calories and hunger recovery
+    CHECK_NEAR(pred->hunger, 10.0f, 0.01);
+    CHECK_EQ(pred->calories, 45); // 10 + 35
+    CHECK_TRUE(pred->life_force > 50.0f);
+}
+
+TEST_CASE(TC_COMBAT_02_Predation_Injury) {
+    GridMatrix grid;
+    EntityManager em;
+
+    // Predator: 2x2 male at (50, 50), starving (hunger=1.0), damage=1
+    uint32_t pred_id = em.CreateOrganism({50, 50}, Gender::MALE, 2, 2, 20);
+    grid.Occupy(50, 50, 2, 2, EntityType::ORGANISM, pred_id);
+
+    // Prey: 1x1 female at (52, 50), full HP (100.0)
+    uint32_t prey_id = em.CreateOrganism({52, 50}, Gender::FEMALE, 1, 1, 40);
+    grid.Occupy(52, 50, 1, 1, EntityType::ORGANISM, prey_id);
+
+    Organism* pred = em.GetOrganism(pred_id);
+    pred->hunger = 1.0f;
+    pred->thirst = 10.0f;
+
+    Organism* prey = em.GetOrganism(prey_id);
+    prey->life_force = 100.0f;
+
+    AIEngine ai;
+    std::mt19937 rng(42);
+
+    ai.UpdateAI(pred_id, em, grid, 0.1f, rng);
+
+    prey = em.GetOrganism(prey_id);
+    CHECK_TRUE(prey != nullptr && prey->alive);
+    // Takes 1 * 12.0 = 12.0 damage -> 88.0
+    CHECK_NEAR(prey->life_force, 88.0f, 0.01);
+}
+
+TEST_CASE(TC_GRAPH_01_Population_History_Recorded) {
+    Simulation sim(777);
+    CHECK_TRUE(!sim.GetPopulationHistory().empty());
+    size_t initial_history_size = sim.GetPopulationHistory().size();
+
+    // Step by 1.0 second
+    sim.Step(1.0f);
+    CHECK_EQ(sim.GetPopulationHistory().size(), initial_history_size + 1);
+
+    const auto& pt = sim.GetPopulationHistory().back();
+    CHECK_TRUE(pt.males >= 0);
+    CHECK_TRUE(pt.females >= 0);
+    CHECK_TRUE(pt.food >= 0);
+}
+
+TEST_CASE(TC_SAVE_01_Serialize_And_Restore) {
+    const std::string save_path = "test_snapshot.json";
+    Simulation sim1(12345);
+
+    // Advance simulation to generate dynamic state
+    sim1.Step(1.0f);
+    sim1.Step(1.0f);
+
+    CHECK_TRUE(sim1.SaveState(save_path));
+
+    Simulation sim2(99999); // Initialized differently
+    CHECK_TRUE(sim2.LoadState(save_path));
+
+    CHECK_EQ(sim2.GetStepCount(), sim1.GetStepCount());
+    CHECK_EQ(sim2.RemainingMalePlacements(), sim1.RemainingMalePlacements());
+    CHECK_EQ(sim2.RemainingFemalePlacements(), sim1.RemainingFemalePlacements());
+    CHECK_EQ(static_cast<int>(sim2.GetGameStatus()), static_cast<int>(sim1.GetGameStatus()));
+    CHECK_EQ(sim2.MaleCount(), sim1.MaleCount());
+    CHECK_EQ(sim2.FemaleCount(), sim1.FemaleCount());
+    CHECK_EQ(sim2.GetEntities().ActiveOrganismCount(), sim1.GetEntities().ActiveOrganismCount());
+    CHECK_EQ(sim2.GetEntities().ActiveResourceCount(), sim1.GetEntities().ActiveResourceCount());
+    CHECK_EQ(sim2.GetGrid().OccupiedCellCount(), sim1.GetGrid().OccupiedCellCount());
+    CHECK_EQ(sim2.GetPopulationHistory().size(), sim1.GetPopulationHistory().size());
+
+    // Detailed organism verification
+    const auto& orgs1 = sim1.GetEntities().GetOrganisms();
+    const auto& orgs2 = sim2.GetEntities().GetOrganisms();
+    CHECK_EQ(orgs1.size(), orgs2.size());
+    for (size_t i = 0; i < orgs1.size(); ++i) {
+        CHECK_EQ(orgs1[i].id, orgs2[i].id);
+        CHECK_EQ(orgs1[i].pos.x, orgs2[i].pos.x);
+        CHECK_EQ(orgs1[i].pos.y, orgs2[i].pos.y);
+        CHECK_EQ(orgs1[i].w, orgs2[i].w);
+        CHECK_EQ(orgs1[i].h, orgs2[i].h);
+        CHECK_EQ(static_cast<int>(orgs1[i].gender), static_cast<int>(orgs2[i].gender));
+        CHECK_NEAR(orgs1[i].life_force, orgs2[i].life_force, 0.001);
+        CHECK_EQ(orgs1[i].calories, orgs2[i].calories);
+        CHECK_EQ(orgs1[i].scent, orgs2[i].scent);
+        CHECK_EQ(orgs1[i].damage, orgs2[i].damage);
+        CHECK_EQ(orgs1[i].alive, orgs2[i].alive);
+    }
+
+    std::remove(save_path.c_str());
+}
+
+TEST_CASE(TC_SAVE_02_Invalid_Or_Missing_File) {
+    Simulation sim;
+    CHECK_FALSE(sim.LoadState("non_existent_file_xyz_1234.json"));
+
+    const std::string corrupt_path = "test_corrupt.json";
+    {
+        std::ofstream out(corrupt_path);
+        out << "{\"version\": 1, \"organisms\": ["; // Incomplete / truncated JSON
+    }
+    CHECK_FALSE(sim.LoadState(corrupt_path));
+    std::remove(corrupt_path.c_str());
+}
+
+
+
+
 
 
 

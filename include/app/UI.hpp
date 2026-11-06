@@ -14,7 +14,7 @@ public:
     void Init();
     void Cleanup();
 
-    void DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, float time_scale, bool paused, const sim::Organism* hovered_org = nullptr);
+    void DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, float time_scale, bool paused, const sim::Organism* hovered_org = nullptr, const std::string& notification_msg = "");
 
     void DrawCrispText(const char* text, float x, float y, float font_size, Color color) const;
     void DrawCrispText(const std::string& text, float x, float y, float font_size, Color color) const {

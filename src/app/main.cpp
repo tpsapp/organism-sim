@@ -38,6 +38,14 @@ int main() {
     sim::ActiveTool active_tool = sim::ActiveTool::FOOD;
     float time_scale = 1.0f;
     bool paused = false;
+    std::string notification_msg;
+    float notification_timer = 0.0f;
+
+    Camera2D camera{};
+    camera.target = Vector2{sim::PLAYFIELD_WIDTH_PX / 2.0f, sim::PLAYFIELD_HEIGHT_PX / 2.0f};
+    camera.offset = Vector2{sim::PLAYFIELD_WIDTH_PX / 2.0f, sim::PLAYFIELD_HEIGHT_PX / 2.0f};
+    camera.rotation = 0.0f;
+    camera.zoom = 1.0f;
 
     constexpr float FIXED_TIMESTEP = 0.05f; // 20 simulation updates per second
     float accumulator = 0.0f;
@@ -71,19 +79,67 @@ int main() {
             if (time_scale > 1.0f) time_scale /= 2.0f;
         }
 
+        // Save / Load System (F5 / F9)
+        if (notification_timer > 0.0f) {
+            notification_timer -= frame_dt;
+            if (notification_timer <= 0.0f) {
+                notification_msg.clear();
+            }
+        }
+
+        if (IsKeyPressed(KEY_F5)) {
+            bool ok = simulation.SaveState("saved_simulation.json");
+            notification_msg = ok ? "Saved: saved_simulation.json (F5)" : "Save Failed! (F5)";
+            notification_timer = 3.5f;
+        }
+
+        if (IsKeyPressed(KEY_F9)) {
+            bool ok = simulation.LoadState("saved_simulation.json");
+            notification_msg = ok ? "Loaded: saved_simulation.json (F9)" : "Load Failed / File Missing (F9)";
+            notification_timer = 3.5f;
+        }
+
+        // Camera Pan & Zoom Controls
+        Vector2 mouse_pos = GetMousePosition();
+        bool mouse_in_playfield = (mouse_pos.x >= 0 && mouse_pos.x < sim::PLAYFIELD_WIDTH_PX &&
+                                   mouse_pos.y >= 0 && mouse_pos.y < sim::PLAYFIELD_HEIGHT_PX);
+
+        // Zoom with wheel
+        float wheel = GetMouseWheelMove();
+        if (wheel != 0.0f && mouse_in_playfield) {
+            Vector2 mouse_world_before = GetScreenToWorld2D(mouse_pos, camera);
+            camera.offset = mouse_pos;
+            camera.target = mouse_world_before;
+            camera.zoom = std::clamp(camera.zoom + wheel * 0.15f, 0.75f, 4.0f);
+        }
+
+        // Pan with Right Mouse Drag
+        if (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) && mouse_in_playfield) {
+            Vector2 delta = GetMouseDelta();
+            delta.x = -delta.x / camera.zoom;
+            delta.y = -delta.y / camera.zoom;
+            camera.target.x += delta.x;
+            camera.target.y += delta.y;
+        }
+
+        // Reset Camera ('C' or 'Home')
+        if (IsKeyPressed(KEY_C) || IsKeyPressed(KEY_HOME)) {
+            camera.target = Vector2{sim::PLAYFIELD_WIDTH_PX / 2.0f, sim::PLAYFIELD_HEIGHT_PX / 2.0f};
+            camera.offset = Vector2{sim::PLAYFIELD_WIDTH_PX / 2.0f, sim::PLAYFIELD_HEIGHT_PX / 2.0f};
+            camera.zoom = 1.0f;
+        }
+
         // ---------------------------------------------------------------------
         // Mouse Hover & Placement
         // ---------------------------------------------------------------------
-        Vector2 mouse_pos = GetMousePosition();
         const sim::Organism* hovered_org = nullptr;
-        bool mouse_in_playfield = (mouse_pos.x >= 0 && mouse_pos.x < sim::PLAYFIELD_WIDTH_PX &&
-                                   mouse_pos.y >= 0 && mouse_pos.y < sim::PLAYFIELD_HEIGHT_PX);
         int hover_cell_x = -1;
         int hover_cell_y = -1;
 
         if (mouse_in_playfield) {
-            hover_cell_x = static_cast<int>(mouse_pos.x) / sim::CELL_SIZE_PX;
-            hover_cell_y = static_cast<int>(mouse_pos.y) / sim::CELL_SIZE_PX;
+            Vector2 world_pos = GetScreenToWorld2D(mouse_pos, camera);
+            hover_cell_x = static_cast<int>(world_pos.x) / sim::CELL_SIZE_PX;
+            hover_cell_y = static_cast<int>(world_pos.y) / sim::CELL_SIZE_PX;
             hovered_org = simulation.GetOrganismAt(hover_cell_x, hover_cell_y);
         }
 
@@ -121,8 +177,15 @@ int main() {
         BeginDrawing();
         ClearBackground(BLACK);
 
+        BeginScissorMode(0, 0, sim::PLAYFIELD_WIDTH_PX, sim::PLAYFIELD_HEIGHT_PX);
+        BeginMode2D(camera);
+
         renderer.DrawPlayfield(simulation, hovered_org);
-        ui.DrawSidebar(simulation, active_tool, time_scale, paused, hovered_org);
+
+        EndMode2D();
+        EndScissorMode();
+
+        ui.DrawSidebar(simulation, active_tool, time_scale, paused, hovered_org, notification_msg);
 
         EndDrawing();
     }

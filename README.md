@@ -126,7 +126,12 @@ As organisms consume food and survive across seasons, their lifetime calorie cou
 | `3` | **Select Male Tool** | Manual placement of male organisms (quota: up to 10 per session). |
 | `4` | **Select Female Tool** | Manual placement of female organisms (quota: up to 10 per session). |
 | `Left Click` | **Place Entity** | Places selected tool entity at the mouse cursor position on the grid. |
-| `Mouse Hover` | **Inspect Organism** | Highlights organism footprint and populates the bottom inspector card. |
+| `Mouse Hover` | **Inspect Organism** | Highlights organism footprint, sensory radii (Cyan sight & Violet smell), and populates inspector card. |
+| `Right Drag` | **Pan Viewport** | Pans 2D camera across the playfield with automatic edge scissor clipping. |
+| `Mouse Wheel` | **Zoom Viewport** | Smoothly zooms camera ($0.75\times$ to $4.0\times$) anchored to the mouse position. |
+| `C` / `Home` | **Reset Camera** | Centers the playfield camera and restores default $1.0\times$ zoom. |
+| `F5` | **Quick Save State** | Serializes the complete world snapshot, history, and entities to `saved_simulation.json`. |
+| `F9` | **Quick Load State** | Restores exact world state, grid occupancy, and population metrics from snapshot. |
 | `R` | **Reset Simulation** | Clears grid, resets quotas and step counters, and re-seeds world. |
 
 ---

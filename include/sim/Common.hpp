@@ -72,4 +72,10 @@ enum class GameStatus : uint8_t { ONGOING = 0, VICTORY, DEFEAT };
 
 enum class ActiveTool : uint8_t { FOOD = 1, WATER = 2, MALE = 3, FEMALE = 4 };
 
+struct PopulationSample {
+    int males{0};
+    int females{0};
+    int food{0};
+};
+
 } // namespace sim

@@ -44,8 +44,14 @@ Organism AIEngine::CreateOffspring(const Organism& mother, const Organism& fathe
     child.calories = cal_dist(rng);
     child.lifetime_calories = 0;
 
-    std::uniform_int_distribution<int> scent_dist(1, 0xFFFD);
-    child.scent = static_cast<uint16_t>(scent_dist(rng));
+    // Biparental scent inheritance: 50/50 parental baseline with small mutation
+    std::uniform_int_distribution<int> parent_scent_pick(0, 1);
+    uint16_t base_scent = (parent_scent_pick(rng) == 0) ? mother.scent : father.scent;
+    std::uniform_int_distribution<int> scent_mutation(-5, 5);
+    int mutated_scent = static_cast<int>(base_scent) + scent_mutation(rng);
+    if (mutated_scent <= 0) mutated_scent = 1;
+    if (mutated_scent >= 0xFFFD) mutated_scent = 0xFFFD;
+    child.scent = static_cast<uint16_t>(mutated_scent);
     if (child.scent == SCENT_FOOD || child.scent == SCENT_WATER) {
         child.scent = 1;
     }
@@ -56,6 +62,10 @@ Organism AIEngine::CreateOffspring(const Organism& mother, const Organism& fathe
     child.thirst = 10.0f;
     child.gestating = false;
     child.gestation_timer = 0.0f;
+    child.father_id = 0;
+    child.father_scent = 0;
+    child.father_sight_range = 4;
+    child.father_smell_range = 6;
     child.age_timer = 0.0f;
     child.step_cooldown = 0.0f;
     child.current_state = FSMState::WANDER;
@@ -81,27 +91,49 @@ struct PathResult {
     uint32_t target_id{0};
 };
 
+template <typename Callback>
+inline void ForEachAdjacentCell(const Vector2i& pos, int w, int h, const GridMatrix& grid, Callback&& cb) {
+    int min_x = pos.x - 1;
+    int max_x = pos.x + w;
+    int min_y = pos.y - 1;
+    int max_y = pos.y + h;
+
+    for (int y = min_y; y <= max_y; ++y) {
+        for (int x = min_x; x <= max_x; ++x) {
+            if (x >= pos.x && x < pos.x + w && y >= pos.y && y < pos.y + h) {
+                continue;
+            }
+            if (grid.InBounds(x, y)) {
+                if (!cb(x, y, grid.At(x, y))) {
+                    return;
+                }
+            }
+        }
+    }
+}
+
 PathResult FindReachableResource(const Organism& org, const EntityManager& em, const GridMatrix& grid, EntityType desired_type) {
     PathResult result;
 
-    // 1. Check if already adjacent to any matching resource
-    int best_adj_dist = std::numeric_limits<int>::max();
-    for (const auto& res : em.GetResources()) {
-        if (!res.alive || res.type != desired_type) continue;
-        int dist = AIEngine::ChebyshevDistance(org.pos, org.w, org.h, res.pos, 1, 1);
-        if (dist <= 1 && dist < best_adj_dist) {
-            best_adj_dist = dist;
-            result.found = true;
-            result.first_step = {0, 0};
-            result.target_pos = res.pos;
-            result.target_w = 1;
-            result.target_h = 1;
-            result.target_id = res.id;
+    // 1. Direct O(1) grid check if already adjacent to any matching resource
+    ForEachAdjacentCell(org.pos, org.w, org.h, grid, [&](int, int, const Cell& cell) {
+        if (cell.type == desired_type && cell.entity_id != 0) {
+            const Resource* res = em.GetResource(cell.entity_id);
+            if (res && res->alive) {
+                result.found = true;
+                result.first_step = {0, 0};
+                result.target_pos = res->pos;
+                result.target_w = 1;
+                result.target_h = 1;
+                result.target_id = res->id;
+                return false;
+            }
         }
-    }
+        return true;
+    });
     if (result.found) return result;
 
-    // 2. BFS for closest reachable matching resource within smell_range
+    // 2. BFS for closest reachable matching resource within smell_range using O(1) grid inspection
     int min_x = std::max(0, org.pos.x - org.smell_range);
     int max_x = std::min(GRID_WIDTH - org.w, org.pos.x + org.smell_range);
     int min_y = std::max(0, org.pos.y - org.smell_range);
@@ -143,19 +175,29 @@ PathResult FindReachableResource(const Organism& org, const EntityManager& em, c
     while (head < queue.size()) {
         Node curr = queue[head++];
 
-        // Check if curr is adjacent to any matching resource within smell_range
-        for (const auto& res : em.GetResources()) {
-            if (!res.alive || res.type != desired_type) continue;
-            if (AIEngine::ChebyshevDistance(org.pos, org.w, org.h, res.pos, 1, 1) > org.smell_range) continue;
-            if (AIEngine::AreAdjacent(curr.pos, org.w, org.h, res.pos, 1, 1)) {
-                result.found = true;
-                result.first_step = curr.first_step;
-                result.target_pos = res.pos;
-                result.target_w = 1;
-                result.target_h = 1;
-                result.target_id = res.id;
-                return result;
+        // Inspect adjacent perimeter cells via grid in O(1) rather than scanning all resources
+        bool found_target = false;
+        ForEachAdjacentCell(curr.pos, org.w, org.h, grid, [&](int, int, const Cell& cell) {
+            if (cell.type == desired_type && cell.entity_id != 0) {
+                const Resource* res = em.GetResource(cell.entity_id);
+                if (res && res->alive) {
+                    if (AIEngine::ChebyshevDistance(org.pos, org.w, org.h, res->pos, 1, 1) <= org.smell_range) {
+                        result.found = true;
+                        result.first_step = curr.first_step;
+                        result.target_pos = res->pos;
+                        result.target_w = 1;
+                        result.target_h = 1;
+                        result.target_id = res->id;
+                        found_target = true;
+                        return false;
+                    }
+                }
             }
+            return true;
+        });
+
+        if (found_target) {
+            return result;
         }
 
         // Expand neighbors
@@ -182,24 +224,27 @@ PathResult FindReachableMate(const Organism& org, const EntityManager& em, const
     PathResult result;
     Gender opp_gender = (org.gender == Gender::MALE) ? Gender::FEMALE : Gender::MALE;
 
-    // 1. Check adjacent mate first
-    for (const auto& other : em.GetOrganisms()) {
-        if (!other.alive || other.id == org.id || other.gender != opp_gender) continue;
-        if (other.age < REPRODUCTION_MIN_AGE || other.gestating) continue;
-        if (other.hunger <= REPRODUCTION_MIN_HUNGER || other.thirst <= REPRODUCTION_MIN_THIRST) continue;
-
-        if (AIEngine::AreAdjacent(org.pos, org.w, org.h, other.pos, other.w, other.h)) {
-            result.found = true;
-            result.first_step = {0, 0};
-            result.target_pos = other.pos;
-            result.target_w = other.w;
-            result.target_h = other.h;
-            result.target_id = other.id;
-            return result;
+    // 1. Direct O(1) grid check if already adjacent to any compatible mate
+    ForEachAdjacentCell(org.pos, org.w, org.h, grid, [&](int, int, const Cell& cell) {
+        if (cell.type == EntityType::ORGANISM && cell.entity_id != 0 && cell.entity_id != org.id) {
+            const Organism* other = em.GetOrganism(cell.entity_id);
+            if (other && other->alive && other->gender == opp_gender &&
+                other->age >= REPRODUCTION_MIN_AGE && !other->gestating &&
+                other->hunger > REPRODUCTION_MIN_HUNGER && other->thirst > REPRODUCTION_MIN_THIRST) {
+                result.found = true;
+                result.first_step = {0, 0};
+                result.target_pos = other->pos;
+                result.target_w = other->w;
+                result.target_h = other->h;
+                result.target_id = other->id;
+                return false;
+            }
         }
-    }
+        return true;
+    });
+    if (result.found) return result;
 
-    // 2. BFS for reachable mate
+    // 2. BFS for reachable mate using O(1) grid inspection
     int min_x = std::max(0, org.pos.x - org.smell_range);
     int max_x = std::min(GRID_WIDTH - org.w, org.pos.x + org.smell_range);
     int min_y = std::max(0, org.pos.y - org.smell_range);
@@ -241,21 +286,30 @@ PathResult FindReachableMate(const Organism& org, const EntityManager& em, const
     while (head < queue.size()) {
         Node curr = queue[head++];
 
-        for (const auto& other : em.GetOrganisms()) {
-            if (!other.alive || other.id == org.id || other.gender != opp_gender) continue;
-            if (other.age < REPRODUCTION_MIN_AGE || other.gestating) continue;
-            if (other.hunger <= REPRODUCTION_MIN_HUNGER || other.thirst <= REPRODUCTION_MIN_THIRST) continue;
-            if (AIEngine::ChebyshevDistance(org.pos, org.w, org.h, other.pos, other.w, other.h) > org.smell_range) continue;
-
-            if (AIEngine::AreAdjacent(curr.pos, org.w, org.h, other.pos, other.w, other.h)) {
-                result.found = true;
-                result.first_step = curr.first_step;
-                result.target_pos = other.pos;
-                result.target_w = other.w;
-                result.target_h = other.h;
-                result.target_id = other.id;
-                return result;
+        bool found_target = false;
+        ForEachAdjacentCell(curr.pos, org.w, org.h, grid, [&](int, int, const Cell& cell) {
+            if (cell.type == EntityType::ORGANISM && cell.entity_id != 0 && cell.entity_id != org.id) {
+                const Organism* other = em.GetOrganism(cell.entity_id);
+                if (other && other->alive && other->gender == opp_gender &&
+                    other->age >= REPRODUCTION_MIN_AGE && !other->gestating &&
+                    other->hunger > REPRODUCTION_MIN_HUNGER && other->thirst > REPRODUCTION_MIN_THIRST) {
+                    if (AIEngine::ChebyshevDistance(org.pos, org.w, org.h, other->pos, other->w, other->h) <= org.smell_range) {
+                        result.found = true;
+                        result.first_step = curr.first_step;
+                        result.target_pos = other->pos;
+                        result.target_w = other->w;
+                        result.target_h = other->h;
+                        result.target_id = other->id;
+                        found_target = true;
+                        return false;
+                    }
+                }
             }
+            return true;
+        });
+
+        if (found_target) {
+            return result;
         }
 
         for (const auto& dir : kDirs) {
@@ -301,13 +355,21 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
                     uint32_t child_id = entity_mgr.CreateOrganism(birth_pos, Gender::MALE);
                     Organism* child = entity_mgr.GetOrganism(child_id);
                     if (child) {
-                        *child = CreateOffspring(mother_copy, mother_copy, birth_pos, child_id, rng);
+                        Organism father_info = mother_copy;
+                        father_info.id = mother_copy.father_id;
+                        father_info.scent = (mother_copy.father_scent != 0) ? mother_copy.father_scent : mother_copy.scent;
+                        father_info.sight_range = mother_copy.father_sight_range;
+                        father_info.smell_range = mother_copy.father_smell_range;
+
+                        *child = CreateOffspring(mother_copy, father_info, birth_pos, child_id, rng);
                         grid.Occupy(birth_pos.x, birth_pos.y, 1, 1, EntityType::ORGANISM, child_id);
                     }
                     p_org = entity_mgr.GetOrganism(org_id);
                     if (p_org) {
                         p_org->gestating = false;
                         p_org->gestation_timer = 0.0f;
+                        p_org->father_id = 0;
+                        p_org->father_scent = 0;
                     }
                     birthed = true;
                     break;
@@ -316,6 +378,10 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
             if (!birthed) {
                 p_org = entity_mgr.GetOrganism(org_id);
                 if (p_org) p_org->gestation_timer = 0.0f;
+            } else {
+                p_org = entity_mgr.GetOrganism(org_id);
+                if (p_org) p_org->step_cooldown = BASE_STEP_INTERVAL;
+                return;
             }
         }
     }
@@ -349,6 +415,41 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
 
     if (is_critical) {
         org.current_state = FSMState::CRITICAL_NEED;
+
+        // Opportunistic Predation: larger starving organism attacks adjacent smaller prey
+        if (org.hunger <= CRITICAL_NEED_THRESHOLD && org.damage >= 1) {
+            uint32_t prey_id = 0;
+            ForEachAdjacentCell(org.pos, org.w, org.h, grid, [&](int, int, const Cell& cell) {
+                if (cell.type == EntityType::ORGANISM && cell.entity_id != 0 && cell.entity_id != org.id) {
+                    const Organism* candidate = entity_mgr.GetOrganism(cell.entity_id);
+                    if (candidate && candidate->alive && (candidate->w * candidate->h < org.w * org.h)) {
+                        prey_id = candidate->id;
+                        return false; // found prey, stop
+                    }
+                }
+                return true;
+            });
+
+            if (prey_id != 0) {
+                Organism* prey = entity_mgr.GetOrganism(prey_id);
+                if (prey && prey->alive) {
+                    prey->life_force -= org.damage * 12.0f;
+                    if (prey->life_force <= 0.0f) {
+                        prey->alive = false;
+                        grid.Vacate(prey->pos.x, prey->pos.y, prey->w, prey->h);
+                        org.hunger = 10.0f;
+                        org.calories += 35;
+                        org.lifetime_calories += 35;
+                        org.life_force = std::min(100.0f, org.life_force + 15.0f);
+                        org.step_cooldown = BASE_STEP_INTERVAL;
+                        return;
+                    } else {
+                        prey->step_cooldown = BASE_STEP_INTERVAL * 0.5f;
+                    }
+                }
+            }
+        }
+
         EntityType desired_type = (org.thirst <= org.hunger) ? EntityType::WATER : EntityType::FOOD;
         EntityType alt_type = (desired_type == EntityType::WATER) ? EntityType::FOOD : EntityType::WATER;
 
@@ -404,9 +505,14 @@ void AIEngine::UpdateAI(uint32_t org_id, EntityManager& entity_mgr, GridMatrix& 
             Organism* mate = entity_mgr.GetOrganism(target_mate_id);
             if (mate && mate->alive && AreScentsCompatible(org.scent, mate->scent)) {
                 Organism* female = (org.gender == Gender::FEMALE) ? &org : mate;
+                Organism* male = (org.gender == Gender::MALE) ? &org : mate;
                 if (!female->gestating) {
                     female->gestating = true;
                     female->gestation_timer = GESTATION_TIME;
+                    female->father_id = male->id;
+                    female->father_scent = male->scent;
+                    female->father_sight_range = male->sight_range;
+                    female->father_smell_range = male->smell_range;
                 }
                 return;
             }

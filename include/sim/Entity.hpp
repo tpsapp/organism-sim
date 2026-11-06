@@ -32,6 +32,10 @@ struct Organism {
     int smell_range{6};
     bool gestating{false};
     float gestation_timer{0.0f};
+    uint32_t father_id{0};
+    uint16_t father_scent{0};
+    int father_sight_range{4};
+    int father_smell_range{6};
     float age_timer{0.0f};
     float step_cooldown{0.0f};
     FSMState current_state{FSMState::WANDER};

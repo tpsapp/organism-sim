@@ -51,7 +51,7 @@ void UI::DrawCrispText(const char* text, float x, float y, float font_size, Colo
     }
 }
 
-void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, float time_scale, bool paused, const sim::Organism* hovered_org) {
+void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, float time_scale, bool paused, const sim::Organism* hovered_org, const std::string& notification_msg) {
     int sx = sim::PLAYFIELD_WIDTH_PX;
     int sy = 0;
     int sw = sim::SIDEBAR_WIDTH_PX;
@@ -70,7 +70,14 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
     DrawCrispText("ORGANISM SIM", static_cast<float>(sx + 20), static_cast<float>(y), 22.0f, Color{240, 240, 245, 255});
     y += 28;
     DrawCrispText("A-Life Multi-Tile Engine", static_cast<float>(sx + 20), static_cast<float>(y), 13.0f, Color{140, 145, 160, 255});
-    y += 20;
+    y += 18;
+
+    if (!notification_msg.empty()) {
+        DrawRectangle(sx + 15, y, sw - 30, 24, Color{35, 75, 55, 255});
+        DrawRectangleLines(sx + 15, y, sw - 30, 24, Color{46, 204, 113, 255});
+        DrawCrispText(notification_msg, static_cast<float>(sx + 22), static_cast<float>(y + 5), 12.0f, Color{230, 255, 230, 255});
+        y += 28;
+    }
 
     DrawLine(sx + 20, y, sx + sw - 20, y, Color{50, 52, 65, 255});
     y += 12;
@@ -149,7 +156,50 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
         else ++water_cnt;
     }
     draw_text_row("Food: " + std::to_string(food_cnt) + " | Water: " + std::to_string(water_cnt), 13, Color{160, 165, 180, 255});
-    y += 6;
+    y += 4;
+
+    // Real-Time Demographic Dynamic Graph
+    const auto& history = sim.GetPopulationHistory();
+    if (history.size() >= 2) {
+        int graph_x = sx + 20;
+        int graph_y = y;
+        int graph_w = sw - 40;
+        int graph_h = 42;
+
+        DrawRectangle(graph_x, graph_y, graph_w, graph_h, Color{20, 22, 28, 255});
+        DrawRectangleLines(graph_x, graph_y, graph_w, graph_h, Color{45, 48, 62, 255});
+
+        int max_val = 20;
+        for (const auto& pt : history) {
+            max_val = std::max(max_val, std::max(pt.males + pt.females, pt.food));
+        }
+
+        float dx = static_cast<float>(graph_w) / static_cast<float>(history.size() - 1);
+        for (size_t i = 0; i < history.size() - 1; ++i) {
+            float x1 = graph_x + static_cast<float>(i) * dx;
+            float x2 = graph_x + static_cast<float>(i + 1) * dx;
+
+            auto to_gy = [&](int val) -> float {
+                float norm = std::clamp(static_cast<float>(val) / static_cast<float>(max_val), 0.0f, 1.0f);
+                return static_cast<float>(graph_y + graph_h - 2) - norm * static_cast<float>(graph_h - 4);
+            };
+
+            // Food (Red line)
+            DrawLineEx(Vector2{x1, to_gy(history[i].food)},
+                       Vector2{x2, to_gy(history[i + 1].food)}, 1.0f, Color{180, 50, 50, 200});
+
+            // Males (Blue line)
+            DrawLineEx(Vector2{x1, to_gy(history[i].males)},
+                       Vector2{x2, to_gy(history[i + 1].males)}, 1.5f, Color{70, 150, 255, 255});
+
+            // Females (Yellow line)
+            DrawLineEx(Vector2{x1, to_gy(history[i].females)},
+                       Vector2{x2, to_gy(history[i + 1].females)}, 1.5f, Color{240, 220, 70, 255});
+        }
+        y += graph_h + 8;
+    } else {
+        y += 6;
+    }
 
     DrawLine(sx + 20, y, sx + sw - 20, y, Color{50, 52, 65, 255});
     y += 12;
@@ -193,12 +243,15 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
 
     // Controls Guide
     draw_text_row("CONTROLS", 15, Color{220, 225, 240, 255});
-    draw_text_row("Space  : Pause / Resume", 13, Color{160, 165, 180, 255});
-    draw_text_row("+ / -  : Adjust Speed (1-8x)", 13, Color{160, 165, 180, 255});
-    draw_text_row("1 - 4  : Select Tool", 13, Color{160, 165, 180, 255});
-    draw_text_row("L-Click: Place Entity", 13, Color{160, 165, 180, 255});
-    draw_text_row("R      : Reset Simulation", 13, Color{160, 165, 180, 255});
-    y += 6;
+    draw_text_row("Space  : Pause / Resume", 12, Color{160, 165, 180, 255});
+    draw_text_row("+ / -  : Adjust Speed (1-8x)", 12, Color{160, 165, 180, 255});
+    draw_text_row("1 - 4  : Select Tool", 12, Color{160, 165, 180, 255});
+    draw_text_row("L-Click: Place Entity", 12, Color{160, 165, 180, 255});
+    draw_text_row("F5 / F9: Save / Load State", 12, Color{160, 165, 180, 255});
+    draw_text_row("R-Drag : Pan Viewport", 12, Color{160, 165, 180, 255});
+    draw_text_row("Wheel/C: Zoom / Reset Cam", 12, Color{160, 165, 180, 255});
+    draw_text_row("R      : Reset Simulation", 12, Color{160, 165, 180, 255});
+    y += 4;
 
     DrawLine(sx + 20, y, sx + sw - 20, y, Color{50, 52, 65, 255});
     y += 12;
@@ -253,9 +306,13 @@ void UI::DrawSidebar(const sim::Simulation& sim, sim::ActiveTool active_tool, fl
 
         // Scent & Sensory
         std::ostringstream ss_scent;
-        ss_scent << "Scent: 0x" << std::hex << std::uppercase << hovered_org->scent << std::dec
-                 << " | Sight: " << hovered_org->sight_range << " | Smell: " << hovered_org->smell_range;
+        ss_scent << "Scent: 0x" << std::hex << std::uppercase << hovered_org->scent << std::dec;
         DrawCrispText(ss_scent.str(), static_cast<float>(sx + 25), static_cast<float>(y), 13.0f, Color{160, 165, 180, 255});
+        y += 18;
+
+        std::string sensory_str = "Sight: " + std::to_string(hovered_org->sight_range) + " (Cyan)" +
+                                  " | Smell: " + std::to_string(hovered_org->smell_range) + " (Violet)";
+        DrawCrispText(sensory_str, static_cast<float>(sx + 25), static_cast<float>(y), 12.0f, Color{120, 210, 255, 255});
         y += 18;
 
         // State & Gestation

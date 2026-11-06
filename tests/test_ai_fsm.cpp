@@ -193,3 +193,83 @@ TEST_CASE(TC_AI_09_Pathfinding_Unreachable_Target_Fallback) {
     CHECK_EQ(org->pos.x, 10);
 }
 
+TEST_CASE(TC_GEN_01_Biparental_Inheritance) {
+    GridMatrix grid;
+    EntityManager em;
+    // Father with high traits: sight=6, smell=10, scent=100
+    uint32_t mid = em.CreateOrganism({20, 20}, Gender::MALE, 1, 1, 40, 100);
+    // Mother with low traits: sight=2, smell=4, scent=104 (diff=4, 4%10=4 < 7 compatible)
+    uint32_t fid = em.CreateOrganism({21, 20}, Gender::FEMALE, 1, 1, 40, 104);
+
+    Organism* male = em.GetOrganism(mid);
+    male->sight_range = 6;
+    male->smell_range = 10;
+    male->age = 3;
+    male->hunger = 10.0f;
+    male->thirst = 10.0f;
+    grid.Occupy(20, 20, 1, 1, EntityType::ORGANISM, mid);
+
+    Organism* female = em.GetOrganism(fid);
+    female->sight_range = 2;
+    female->smell_range = 4;
+    female->age = 3;
+    female->hunger = 10.0f;
+    female->thirst = 10.0f;
+    grid.Occupy(21, 20, 1, 1, EntityType::ORGANISM, fid);
+
+    AIEngine ai;
+    std::mt19937 rng(12345);
+
+    // 1. Male triggers mating
+    ai.UpdateAI(mid, em, grid, 0.1f, rng);
+
+    female = em.GetOrganism(fid);
+    CHECK_TRUE(female->gestating);
+    CHECK_EQ(female->father_id, mid);
+    CHECK_EQ(female->father_scent, 100);
+    CHECK_EQ(female->father_sight_range, 6);
+    CHECK_EQ(female->father_smell_range, 10);
+
+    // 2. Female finishes gestation and births child
+    female->gestation_timer = 0.1f;
+    ai.UpdateAI(fid, em, grid, 0.5f, rng);
+
+    female = em.GetOrganism(fid);
+    CHECK_FALSE(female->gestating);
+    CHECK_EQ(em.ActiveOrganismCount(), 3u);
+
+    // 3. Inspect child traits: sight avg (6+2)/2 = 4 (with +-1 jitter: [3, 5])
+    // smell avg (10+4)/2 = 7 (with +-1 jitter: [6, 8])
+    const auto& orgs = em.GetOrganisms();
+    const Organism& child = orgs.back();
+    CHECK_TRUE(child.sight_range >= 3 && child.sight_range <= 5);
+    CHECK_TRUE(child.smell_range >= 6 && child.smell_range <= 8);
+    // Scent should be near father (100) or mother (104) with minor mutation
+    CHECK_TRUE(child.scent >= 90 && child.scent <= 115);
+}
+
+TEST_CASE(TC_PERF_01_BFS_Direct_Grid_Matching) {
+    GridMatrix grid;
+    EntityManager em;
+    uint32_t oid = em.CreateOrganism({30, 30}, Gender::MALE, 1, 1, 40, 10);
+    grid.Occupy(30, 30, 1, 1, EntityType::ORGANISM, oid);
+
+    // Place a food 4 cells away at (34, 30)
+    uint32_t fid = em.CreateResource({34, 30}, EntityType::FOOD);
+    grid.Occupy(34, 30, 1, 1, EntityType::FOOD, fid);
+
+    Organism* org = em.GetOrganism(oid);
+    org->hunger = 1.0f; // Critical need
+    org->thirst = 10.0f;
+
+    AIEngine ai;
+    std::mt19937 rng(42);
+    ai.UpdateAI(oid, em, grid, 1.0f, rng);
+
+    org = em.GetOrganism(oid);
+    // Should step right towards food (x = 31)
+    CHECK_EQ(org->pos.x, 31);
+    CHECK_EQ(org->pos.y, 30);
+}
+
+

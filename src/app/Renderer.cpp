@@ -81,11 +81,34 @@ void Renderer::DrawOrganisms(const sim::Simulation& sim, const sim::Organism* ho
     }
 }
 
+void Renderer::DrawSensoryRadii(const sim::Organism* org) {
+    if (!org) return;
+
+    // 1. Olfactory Smell Range (Chebyshev box, outer purple)
+    int smell_px = (org->pos.x - org->smell_range) * sim::CELL_SIZE_PX;
+    int smell_py = (org->pos.y - org->smell_range) * sim::CELL_SIZE_PX;
+    int smell_pw = (org->w + 2 * org->smell_range) * sim::CELL_SIZE_PX;
+    int smell_ph = (org->h + 2 * org->smell_range) * sim::CELL_SIZE_PX;
+
+    DrawRectangle(smell_px, smell_py, smell_pw, smell_ph, Color{180, 100, 255, 20});
+    DrawRectangleLines(smell_px, smell_py, smell_pw, smell_ph, Color{180, 100, 255, 160});
+
+    // 2. Visual Sight Range (Chebyshev box, inner cyan)
+    int sight_px = (org->pos.x - org->sight_range) * sim::CELL_SIZE_PX;
+    int sight_py = (org->pos.y - org->sight_range) * sim::CELL_SIZE_PX;
+    int sight_pw = (org->w + 2 * org->sight_range) * sim::CELL_SIZE_PX;
+    int sight_ph = (org->h + 2 * org->sight_range) * sim::CELL_SIZE_PX;
+
+    DrawRectangle(sight_px, sight_py, sight_pw, sight_ph, Color{0, 200, 255, 25});
+    DrawRectangleLines(sight_px, sight_py, sight_pw, sight_ph, Color{0, 200, 255, 190});
+}
+
 void Renderer::DrawPlayfield(const sim::Simulation& sim, const sim::Organism* hovered_org) {
     // Background
     DrawRectangle(0, 0, sim::PLAYFIELD_WIDTH_PX, sim::PLAYFIELD_HEIGHT_PX, Color{22, 22, 26, 255});
 
     DrawGridLines();
+    DrawSensoryRadii(hovered_org);
     DrawResources(sim);
     DrawOrganisms(sim, hovered_org);
 

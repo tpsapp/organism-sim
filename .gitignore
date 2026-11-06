@@ -35,3 +35,7 @@ compile_commands.json
 # OS generated files
 .DS_Store
 Thumbs.db
+
+# Simulation snapshots
+saved_simulation.json
+*.snapshot.json

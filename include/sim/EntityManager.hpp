@@ -34,6 +34,11 @@ public:
 
     void Clear();
 
+    void AddOrganism(const Organism& org) { organisms_.push_back(org); }
+    void AddResource(const Resource& res) { resources_.push_back(res); }
+    void SetNextId(uint32_t id) noexcept { next_id_ = id; }
+    [[nodiscard]] uint32_t GetNextId() const noexcept { return next_id_; }
+
 private:
     std::vector<Organism> organisms_;
     std::vector<Resource> resources_;
